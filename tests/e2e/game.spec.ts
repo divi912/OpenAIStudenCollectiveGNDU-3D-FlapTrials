@@ -31,11 +31,14 @@ test('practice flies, a held key does not auto-flap, crashes respawn, and restar
   expect(restarted.crashCount).toBe(0); expect(restarted.checkpointIndex).toBe(0); expect(restarted.z).toBe(0);
 });
 
-test('two browsers join a private room, ready up, and start the same authoritative race', async ({ browser }) => {
+test('two browsers start the same race even when a guest joins before its models finish loading', async ({ browser }) => {
   const context = await browser.newContext();
   const a = await context.newPage(), b = await context.newPage();
+  let releaseModels!: () => void;
+  const heldModels = new Promise<void>(resolve => { releaseModels = resolve; });
+  await b.route('**/models/*.glb', async route => { await heldModels; await route.continue(); });
   await Promise.all([a.goto('/?webgl=1'), b.goto('/?webgl=1')]);
-  for (const page of [a, b]) await expect(page.locator('body')).toHaveAttribute('data-renderer', 'WebGL2', { timeout: 45000 });
+  await expect(a.locator('body')).toHaveAttribute('data-renderer', 'WebGL2', { timeout: 45000 });
   await a.getByRole('button', { name: 'Create a room', exact: true }).click();
   await a.getByLabel('YOUR BIRD NAME').fill('Host Bird');
   await a.getByRole('button', { name: 'Create private room' }).click();
@@ -50,7 +53,12 @@ test('two browsers join a private room, ready up, and start the same authoritati
   await a.getByRole('button', { name: 'Ready up', exact: true }).click();
   await expect(a.getByRole('button', { name: 'Start the race' })).toBeEnabled();
   await a.getByRole('button', { name: 'Start the race' }).click();
+  await b.waitForFunction(() => (window as any).__flap.room?.phase === 'loading');
+  expect(await b.evaluate(() => (window as any).__flap.renderer)).toBeUndefined();
+  releaseModels();
   for (const page of [a, b]) await page.waitForFunction(() => (window as any).__flap.room?.phase === 'racing', { timeout: 15000 });
+  expect(await b.evaluate(() => (window as any).__flap.stats.mode)).toBe('race');
+  expect(await b.evaluate(() => (window as any).__flap.stats.courseId)).toBe('skyline_sprint');
   const [first, second] = await Promise.all([a.evaluate(() => (window as any).__flap.room), b.evaluate(() => (window as any).__flap.room)]);
   expect(first.code).toBe(second.code); expect(first.startTick).toBe(second.startTick); expect(Object.keys(first.players)).toHaveLength(2);
   await context.close();

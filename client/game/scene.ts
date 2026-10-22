@@ -24,6 +24,7 @@ import '@babylonjs/loaders/glTF/index.js';
 import { COURSES, obstacleBoxes, obstaclePose } from '../../shared/courses';
 import type { Box, CourseDefinition, ObstacleDefinition, PlayerSnapshot, RacerState } from '../../shared/protocol';
 import type { Preferences } from '../storage';
+import { presentFrame } from './frame';
 
 interface BirdVisual { root: TransformNode; wings: TransformNode[]; beak?: TransformNode; material?: PBRMaterial; meshes: AbstractMesh[] }
 interface ObstacleVisual { definition: ObstacleDefinition; root: TransformNode; bars: InstancedMesh[]; collars: InstancedMesh[] }
@@ -300,9 +301,10 @@ export class GameScene {
         const behind = this.course?.obstacles.find(o => o.z < local.z && local.z - o.z < 8 && o.kind !== 'gust' && o.kind !== 'speed_zone');
         if (behind) distance = Math.max(3, local.z - behind.z - .7);
         const snap = Math.abs(this.camera.position.z - local.z) > 25;
-        temp.set(local.x * .8, local.y + 2.1, local.z - distance);
+        const cameraY = this.settings.reducedMotion ? 6.5 + (local.y - 6.5) * .35 : local.y;
+        temp.set(local.x * .8, cameraY + 2.1, local.z - distance);
         if (snap) this.follow.copyFrom(temp); else Vector3.LerpToRef(this.follow, temp, 1 - Math.exp(-dt * 12), this.follow);
-        temp.set(local.x * .6, local.y + .45, local.z + 22);
+        temp.set(local.x * .6, cameraY + .45, local.z + 22);
         Vector3.LerpToRef(this.look, temp, snap ? 1 : 1 - Math.exp(-dt * 9), this.look);
         this.camera.position.copyFrom(this.follow); this.camera.setTarget(this.look);
         for (const chunk of this.chunks) chunk.root.setEnabled(chunk.z > local.z - 200 && chunk.z < local.z + 330);
@@ -344,8 +346,8 @@ export class GameScene {
       if (fps < 48 && this.resolution < 1.8) { this.resolution *= 1.12; this.resize(); }
       else if (fps > 68 && this.resolution > 1.02) { this.resolution /= 1.08; this.resize(); }
     }
-    this.scene.render();
+    presentFrame(this.engine, this.scene);
   }
   private boxPose(mesh: InstancedMesh, box: Box) { mesh.position.set(...box.center); mesh.scaling.set(box.half[0] * 2, box.half[1] * 2, box.half[2] * 2); mesh.rotation.z = box.angle ?? 0; }
-  get stats() { return { fps: Math.round(this.engine.getFps()), meshes: this.scene.getActiveMeshes().length, drawCalls: this.instrumentation.drawCallsCounter.current, triangles: this.scene.getActiveIndices() / 3, vertices: this.scene.getTotalVertices(), renderer: this.renderer, width: this.engine.getRenderWidth(), height: this.engine.getRenderHeight() }; }
+  get stats() { return { mode: this.mode, courseId: this.course?.id, fps: Math.round(this.engine.getFps()), meshes: this.scene.getActiveMeshes().length, drawCalls: this.instrumentation.drawCallsCounter.current, triangles: this.scene.getActiveIndices() / 3, vertices: this.scene.getTotalVertices(), renderer: this.renderer, width: this.engine.getRenderWidth(), height: this.engine.getRenderHeight() }; }
 }

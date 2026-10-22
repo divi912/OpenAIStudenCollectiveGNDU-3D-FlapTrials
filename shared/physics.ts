@@ -77,7 +77,7 @@ export function stepRacer(s: RacerState, input: InputFrame, course: CompiledCour
   if (finish !== null && finish < impact && s.checkpointIndex === d.checkpoints.length) {
     s.status = 'finished'; s.finishTick = tick; s.finishFraction = finish;
   } else if (finish !== null && s.checkpointIndex !== d.checkpoints.length) impact = Math.min(impact, finish);
-  if (impact <= 1) {
+  if (impact <= 1 && s.status !== 'finished') {
     s.x = from[0] + (to[0] - from[0]) * impact; s.y = from[1] + (to[1] - from[1]) * impact; s.z = from[2] + (to[2] - from[2]) * impact;
     crash(s, tick, crashCause);
   } else { s.x = to[0]; s.y = to[1]; s.z = to[2]; }

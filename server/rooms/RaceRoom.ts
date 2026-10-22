@@ -22,6 +22,13 @@ export class RaceRoom extends Room<{ state: RaceSchema; input: FlightInput }> {
   private messageTimes = new Map<string, number>();
   private tickTimes: number[] = [];
   private tickCursor = 0;
+  private publishedPhase = 'lobby';
+  private publishPhase(): void {
+    if (this.publishedPhase === this.state.phase) return;
+    this.publishedPhase = this.state.phase;
+    if (this.state.phase === 'lobby') this.unlock(); else this.lock();
+    this.setMetadata({ code: this.state.code, isPublic: this.state.isPublic, phase: this.state.phase });
+  }
   get metrics() {
     const sorted = [...this.tickTimes].sort((a, b) => a - b);
     return { players: this.state.players.size, phase: this.state.phase, p95TickMs: +(sorted[Math.floor(sorted.length * .95)] ?? 0).toFixed(3), maxInputQueue: Math.max(0, ...[...this.state.players.keys()].map(id => this.inputs.get(id).size)) };
@@ -42,6 +49,7 @@ export class RaceRoom extends Room<{ state: RaceSchema; input: FlightInput }> {
         case 'loaded': this.model.loaded(client.sessionId, String(action.hash), Number(action.raceId)); break;
         case 'again': this.model.again(client.sessionId); break;
       }
+      this.publishPhase();
     });
     this.setFixedTimestep(ctx => {
       const begin = performance.now();
@@ -50,13 +58,8 @@ export class RaceRoom extends Room<{ state: RaceSchema; input: FlightInput }> {
         const command = this.inputs.get(id).next();
         if (command && command.raceId === this.state.raceId) this.commands.set(id, command);
       }
-      const previous = this.state.phase;
       this.model.step(ctx.tick, this.commands);
-      if (previous !== this.state.phase) {
-        const open = this.state.phase === 'lobby';
-        if (open) this.unlock(); else this.lock();
-        this.setMetadata({ code: this.state.code, isPublic: this.state.isPublic, phase: this.state.phase });
-      }
+      this.publishPhase();
       for (const id of this.model.ejected.splice(0)) { const client = this.clients.getById(id); client?.send('notice', 'Loading timed out. Please rejoin the lobby.'); client?.leave(4000); }
       this.tickTimes[this.tickCursor++ % 256] = performance.now() - begin;
     }, 60);

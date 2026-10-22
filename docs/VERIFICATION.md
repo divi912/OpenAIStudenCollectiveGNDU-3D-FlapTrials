@@ -7,6 +7,7 @@
 - Browser tests cover the actual Babylon WebGL2 scene, six-course selection, menus/settings, practice controls, crash/reset behavior, and two browsers creating/joining/readying/starting the same authoritative race.
 - Real-transport integration runs a separate Colyseus server with 250 ms simulated RTT to exercise authority, reconnecting the same racer, and retaining voluntary race departures as DNF.
 - Production client/server builds and generated GLBs are validated by the included commands. The assets include editable Blender sources. `npm audit --omit=dev` reports zero vulnerabilities at verification time.
+- Final checks: **32 tests across 7 files**, **4 Playwright browser tests**, type checking, asset validation and production build pass. Regression coverage includes Babylon frame submission, accepting new joins after a rematch, a guest whose models load after joining, and finish crossings that precede a collision within the same tick.
 
 ## 80-client load run
 
@@ -18,7 +19,7 @@ This is a local capacity smoke test, not a one-hour soak, production concurrency
 
 ## Rendering
 
-Local automated Chromium used its available WebGL2 renderer and rendered the initial course at approximately **18 draw calls / 23k active triangles** before final pipe-mesh refinement. The scene contains more active instances than draw calls because geometry/material batches are instanced. F3 displays live counters for the current scene.
+The final production build was opened in automated Chromium. With no WebGPU adapter available it selected WebGL2, displayed both menu and practice correctly, and logged no page errors. The initial course measured **18 draw calls / 26,920 active triangles** with the Blender pipe meshes. This software-rendered run measured about **30 FPS** in practice; it does not establish the 60 FPS target on desktop hardware. The scene contains more active instances than draw calls because geometry/material batches are instanced. F3 displays live counters for the current scene.
 
 WebGPU-first initialization and self-hosted compiler resources are implemented. The headless browser in this environment reports **no available WebGPU adapters**, so end-to-end WebGPU rendering on a real GPU remains unverified. The default startup successfully selected the WebGL2 fallback under that condition.
 

@@ -35,6 +35,14 @@ describe('fixed-step flight', () => {
 });
 
 describe('continuous collision and checkpoints', () => {
+  it('keeps a valid finish that precedes a boundary impact in the same tick', () => {
+    const course = compileCourse({ ...COURSES[0], obstacles: [], checkpoints: [] });
+    const bird = createRacer('bird');
+    Object.assign(bird, { z: course.definition.length - .01, x: course.definition.width / 2 - PHYSICS.radius - .02, vx: 6 });
+    stepRacer(bird, idleInput(), course, 100);
+    expect(bird.status).toBe('finished');
+    expect(bird.crashCount).toBe(0);
+  });
   it('rejects bypassing a mandatory gate around the outside of its frame', () => {
     const course = compileCourse(COURSES[0]); const bird = createRacer('bird');
     Object.assign(bird, { x: 10, y: 6, z: 69.9 });

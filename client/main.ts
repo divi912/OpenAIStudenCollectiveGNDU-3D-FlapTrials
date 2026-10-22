@@ -213,7 +213,10 @@ function frame(now: number) {
 
 showHome();
 GameScene.create(document.querySelector<HTMLCanvasElement>('#world')!, p).then(result => {
-  scene = result; result.showMenu(); document.querySelector('#boot-note')?.remove();
+  scene = result;
+  if (view === 'race' && raceCourse) result.showCourse(getCourse(raceCourse).definition); else result.showMenu();
+  connection.changed();
+  document.querySelector('#boot-note')?.remove();
   document.body.dataset.renderer = result.renderer; requestAnimationFrame(frame);
 }).catch(error => {
   console.error('Could not initialize the game renderer:', error);
