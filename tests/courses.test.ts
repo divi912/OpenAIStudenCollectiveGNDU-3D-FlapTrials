@@ -3,6 +3,12 @@ import { COURSES, compileCourse, obstaclePose } from '../shared/courses';
 import { sanitizeInput, rankRacers } from '../shared/protocol';
 import { createRacer } from '../shared/physics';
 describe('course and protocol integrity', () => {
+  it('quantizes authored coordinates so browser math differences cannot change the course hash', () => {
+    for (const course of COURSES) for (const obstacle of course.obstacles) {
+      expect(obstacle.x).toBe(Number(obstacle.x.toFixed(6)));
+      expect(obstacle.y).toBe(Number(obstacle.y.toFixed(6)));
+    }
+  });
   it('loads all six unrestricted courses and rejects unsafe checkpoint staging', () => {
     expect(COURSES.map(c => c.id)).toEqual(['skyline_sprint', 'the_needle', 'crosswind', 'clockwork', 'terminal_velocity', 'featherless']);
     for (const course of COURSES) expect(compileCourse(course).hash.length).toBeGreaterThan(0);

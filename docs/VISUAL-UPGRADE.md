@@ -1,0 +1,10 @@
+# Flap Trials: visual and flight upgrade
+
+The existing game works, but repetitive rectangular gates, plain birds and a flat corridor make both its appearance and its rhythm too uniform. This pass extends the existing renderer, asset generator and shared course simulation. Keep browser performance, readable collision boundaries, deterministic multiplayer and checkpoint retries.
+
+- Replace the square-only course kit with circular, elliptical, triangular, diamond, hexagonal and rectangular apertures. Render and collision use the same polygon boundary and authoritative animation phase.
+- Compose shorter challenge sequences with altitude/lateral changes, moving gates and recovery spaces. Keep Skyline approachable; later courses demand timing and momentum.
+- Replace the flat runway with an air stadium: floating grandstands, five seating tiers, bird crowds, canopies, banners and thrusters, with grassy islands, plants, waterfalls and balloons beyond. User steering explicitly replaces the cone mountains with an audience. Crowd rows share an alpha-tested atlas and instanced planes; they are not individual bird models. Give courses distinct palettes. Use instancing and distance culling.
+- Upgrade the editable Blender bird with layered flight feathers, tail feathers, belly markings, eye rims, cheeks, toes and a leather flight harness. Improve smooth normals on the obstacle kit.
+- User selected party chaos. Implement synchronized Turbo Flock, Moon Wings and Wild Winds events with three-second warnings, plus automatic gold boost and blue shield pickups. Shields forgive frame scrapes but cannot bypass mandatory openings or world bounds. Race timing and non-solid player bodies stay intact. Powers and collection state are predicted and simulated identically on the server, with protocol/physics/course version bumps.
+- Validate shape clearance, moving collisions, any new mechanic, all-six-course legal-input completion, multiplayer, real browser rendering and production build. Inspect fresh screenshots and profile active geometry/draw calls.

@@ -1,14 +1,18 @@
 {
-  "version": 1,
+  "version": 2,
   "generator": "scripts/models.py",
   "assets": [
     {
       "file": "bird.glb",
-      "bytes": 82444
+      "bytes": 452588
+    },
+    {
+      "file": "bird-lod.glb",
+      "bytes": 148780
     },
     {
       "file": "obstacle-kit.glb",
-      "bytes": 28492
+      "bytes": 39256
     }
   ]
 }

@@ -1,6 +1,6 @@
 # Flap Trials
 
-Tiny wings. Big trials. A keyboard-controlled 3D flight racer for desktop browsers.
+Tiny wings. Big trials. A keyboard-controlled multiplayer party flight racer in a floating bird stadium.
 
 ## Run locally
 
@@ -26,13 +26,19 @@ Choose **Solo practice** for an immediate offline race. To race together, use **
 
 Fly through every solid gate, then the golden checkpoint flags. Missing a mandatory gate also returns you to the previous checkpoint. Wind and golden jetstream zones are non-solid. Crashes take 0.6 seconds to respawn, and the clock keeps running. Every bird has the same hitbox and cannot collide with other racers.
 
+The party upgrade adds circular, oval, triangular, diamond, hexagonal and rectangular gates in tighter sequences. Gold crystals grant **2.5 seconds of Rocket Boost**; blue crystals grant a **4-second Bubble Shield** that forgives frame scrapes while still requiring a valid opening crossing. Pickups are personal to each racer, collected once per race, and active powers clear on a crash.
+
+Starting 12 seconds into the race, a three-second warning announces a shared event. **Turbo Flock** gives everyone a tailwind, **Moon Wings** lowers gravity, and **Wild Winds** adds lateral gusts. Events last seven seconds with recovery gaps between them. All phases use authoritative race ticks, including in client prediction. Solo practice uses the same rules.
+
 ## Renderer and assets
 
 **Babylon.js 9.32** initializes **WebGPU first** when the browser exposes a supported adapter, falling back to WebGL2. WebGPU requires a secure context (HTTPS or localhost) and supporting browser/driver. `?webgl=1` explicitly selects WebGL2 for comparison. Shader compiler assets, fonts and models are served locally; no runtime Babylon CDN connection is needed.
 
-The renderer uses shared geometry, instancing, course-section visibility, a pooled crash effect, simple lighting, and adaptive resolution. Graphics settings never change simulation speed. The simulation runs at 60 Hz; the server publishes state at 20 Hz. A glTF bird uses five meshes and approximately 3,168 triangles; the obstacle kit is 976 triangles. All courses reuse this kit and small procedural geometry rather than downloading separate large environments.
+The renderer uses shared geometry, instancing, course-section visibility, pooled effects, simple lighting, and adaptive resolution. Graphics settings never change simulation speed. The simulation runs at 60 Hz; the server publishes state at 20 Hz. The close-up Blender bird has **18,616 triangles**, while racing birds and smaller menu birds use a **5,954-triangle LOD**. Both retain five meshes and animated wings. The obstacle kit is 976 triangles.
 
-Editable assets are in `assets/source/bird.blend` and `assets/source/obstacle-kit.blend`. Runtime GLBs are in `public/models`. Blender is **not required to run or build the game**; generated GLBs are included.
+Floating grandstands replace the cone mountains and flat runway. Five-tier seating, canopies, banners, thrusters, clouds, garden islands, waterfalls and balloons frame the course. Spectator birds are drawn into a shared alpha-tested atlas and repeated on instanced row panels; the crowd does not instantiate individual bird models. Each course has its own palette. Gate visuals and swept collision share the same polygon boundary and moving pose.
+
+Editable assets are in `assets/source/bird.blend`, `assets/source/bird-lod.blend` and `assets/source/obstacle-kit.blend`. Runtime GLBs are in `public/models`. Blender is **not required to run or build the game**; generated GLBs are included.
 
 To regenerate models, install Blender LTS, set `BLENDER_BIN` to its executable, or extract portable Blender beneath `.tools/blender`:
 

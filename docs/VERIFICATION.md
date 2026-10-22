@@ -1,5 +1,14 @@
 # Local verification — 2026-10-22
 
+## Party/stadium upgrade
+
+- **43 unit/integration tests** pass, including shaped-aperture clearance, rejecting circle-corner bypasses, distinct circle/oval proportions, event warnings and physics, one-time pickup collection, shield boundaries, boosted speed-zone interactions, and all-six-course legal-input completion.
+- **5 Playwright tests** pass, including real Node/Chromium course-hash agreement for all six maps, delayed model startup in a two-browser race, and the first party warning/active event. Authoring coordinates are quantized to six decimal places after a real Chromium/Node `Math.sin` rounding difference was found to change the original raw JSON hash.
+- Updated Blender assets validate: 442 KB / 18,616 triangles for the close-up bird; 145 KB / 5,954 triangles for the racing LOD; 38 KB / 976 triangles for the pipe kit. Editable sources are included. Lowering foliage geometry and introducing the bird LOD reduced the first detailed scene from roughly 369k active triangles to roughly 108k.
+- Fresh production-browser inspection confirms the cone mountains are absent and instanced spectator rows, five-tier grandstands, canopies and banners render. The initial stadium scene measured approximately **59 draw calls / 108k active triangles**, with about **17 FPS on this headless software-rendered run**. This is not the real-hardware 60 FPS target. The available browser again selected WebGL2 because no WebGPU adapter was available. No page errors were logged.
+- A new **70-second / 80-client / 10-room** party-version load run sent **336,640 input frames** and all **80 racers finished**. Maximum sampled per-room p95 callback work was **0.090 ms**, pending queue depth **6**, RSS **231 MB**. The final circle/oval proportion refinement was made after that capacity run; the final six-course simulation tests cover those shapes.
+- Fresh code review found the boosted speed-zone interaction and identical circle/oval proportions. Both were reproduced with failing tests and corrected. Production build/type checking/asset validation pass. The original verification below is retained as baseline evidence.
+
 ## Evidence
 
 - Shared-simulation tests cover discrete flaps/cooldowns, dive caps, render grouping independence, exact swept sphere/box clearance, thin-wall tunneling, mandatory gate crossing, ordered checkpoints, 36-tick respawns, and rejection of premature finishes.

@@ -1,5 +1,5 @@
-export const PROTOCOL_VERSION = 1;
-export const PHYSICS_VERSION = 'flight-1';
+export const PROTOCOL_VERSION = 2;
+export const PHYSICS_VERSION = 'flight-party-2';
 export const TICK_RATE = 60;
 export const DT = 1 / TICK_RATE;
 export const COLORS = ['#ffcc42', '#55bce7', '#ee6865', '#77c875', '#b58ae0', '#f4a36d', '#65cbb6', '#f28eae'] as const;
@@ -14,6 +14,7 @@ export interface RacerState {
   lastProcessedSequence: number;
   simulationTick: number;
   crashCause: string;
+  boostUntilTick: number; shieldUntilTick: number; pickupMask: number;
 }
 export interface PlayerSnapshot extends RacerState { name: string; color: string; ready: boolean; loaded: boolean; connected: boolean }
 export interface RoomSnapshot {
@@ -22,10 +23,12 @@ export interface RoomSnapshot {
   tick: number; startTick: number; deadline: number; players: Record<string, PlayerSnapshot>;
 }
 export interface Box { center: Vec3; half: Vec3; angle?: number }
-export type ObstacleKind = 'ring' | 'wall' | 'shutter' | 'rotating_gate' | 'gust' | 'speed_zone';
+export type ApertureShape = 'circle' | 'oval' | 'triangle' | 'diamond' | 'hexagon' | 'rectangle';
+export type ObstacleKind = 'ring' | 'wall' | 'shutter' | 'rotating_gate' | 'gust' | 'speed_zone' | 'pickup';
 export interface ObstacleDefinition {
   id: string; kind: ObstacleKind; z: number; x: number; y: number; width: number; height: number;
   thickness: number; period: number; phase: number; amplitude: number; strength: number;
+  shape?: ApertureShape; powerUp?: 'boost' | 'shield'; pickupIndex?: number;
 }
 export interface CheckpointDefinition { id: string; z: number; x: number; y: number }
 export interface CourseDefinition {

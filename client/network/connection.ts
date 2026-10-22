@@ -33,6 +33,7 @@ export class Connection {
     this.predictor = Predict.get(room, { mode: 'lerp', delay: 100 });
     this.input = room.input({ type: FlightInput });
     room.onStateChange(state => {
+      if (this.room !== room || !this.predictor) return;
       if (state.protocolVersion !== PROTOCOL_VERSION || state.physicsVersion !== PHYSICS_VERSION || state.courseHash !== getCourse(state.courseId).hash) {
         this.notice('Game version changed. Refresh before joining.'); void this.leave(); return;
       }

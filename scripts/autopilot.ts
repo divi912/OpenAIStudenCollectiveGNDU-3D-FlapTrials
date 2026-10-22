@@ -1,9 +1,9 @@
-import { obstaclePose } from '../shared/courses';
+import { isGate, obstaclePose } from '../shared/courses';
 import type { CourseDefinition, InputFrame, RacerState } from '../shared/protocol';
 
 /** Test/load generator only. Sends the same legal controls as a human; never teleports. */
 export function pilot(p: RacerState, course: CourseDefinition, tick: number, raceStartTick = 0): InputFrame {
-  const next = course.obstacles.find(o => o.z > p.z + .7 && !['gust', 'speed_zone'].includes(o.kind));
+  const next = course.obstacles.find(o => o.z > p.z + .7 && isGate(o));
   let tx = 0, ty = 6;
   if (next) {
     const arrival = (tick - raceStartTick) / 60 + Math.max(0, next.z - p.z) / p.speed;

@@ -2,12 +2,13 @@ import './styles.css';
 import { GameScene } from './game/scene';
 import { Controls } from './game/input';
 import { GameAudio } from './game/audio';
+import { partyEvent } from '../shared/party';
 import { Connection, SERVER_URL } from './network/connection';
 import { COURSES, getCourse } from '../shared/courses';
 import { createRacer, stepRacer } from '../shared/physics';
 import { DT, PHYSICS_VERSION, finishSeconds, rankRacers, type PlayerSnapshot, type RacerState } from '../shared/protocol';
 import { preferences, savePreferences, personalBest } from './storage';
-import { homeTemplate, courseCards, profileModal, helpModal, settingsModal, lobbyModal, hudTemplate, resultsModal, formatTime, icon, escapeHtml } from './ui';
+import { homeTemplate, courseCards, profileModal, helpModal, settingsModal, lobbyModal, hudTemplate, partyHudTemplate, resultsModal, formatTime, icon, escapeHtml } from './ui';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 app.innerHTML = '<canvas id="world" class="world-canvas" aria-label="Flap Trials 3D world"></canvas><div id="home"></div><div id="hud" hidden></div><div id="modal"></div><div id="toast" role="status" aria-live="polite"></div><div id="boot-note">Warming up the wings…</div>';
@@ -24,6 +25,7 @@ let previousCrashCount = 0, previousCheckpoint = 0, finishSoundPlayed = false;
 let previousTime = performance.now(), lastHud = 0, toastTimer = 0, previousCountdown = -1;
 let debug = new URLSearchParams(location.search).has('debug');
 let cueUntil = 0;
+let previousParty = '', previousPickupMask = 0;
 
 function toast(message: string) {
   toastElement.textContent = message; toastElement.classList.add('show'); clearTimeout(toastTimer);
@@ -42,7 +44,7 @@ function showHome() {
   home.innerHTML = homeTemplate(selected); setModal('', ''); scene?.showMenu(); resultsKey = ''; raceCourse = '';
   void updateServerStatus();
 }
-function resetFeedback() { previousCrashCount = 0; previousCheckpoint = 0; finishSoundPlayed = false; previousCountdown = -1; cueUntil = 0; resultsKey = ''; }
+function resetFeedback() { previousCrashCount = 0; previousCheckpoint = 0; finishSoundPlayed = false; previousCountdown = -1; cueUntil = 0; resultsKey = ''; previousParty = ''; previousPickupMask = 0; }
 function startPractice() {
   if (!scene?.ready) { toast('The sky is almost ready. Give it a moment.'); return; }
   audio.unlock(); savePreferences(p); resetFeedback(); practiceTick = 0; accumulator = 0;
@@ -52,7 +54,7 @@ function startPractice() {
 }
 function openRace(courseId: string, isPractice: boolean) {
   view = 'race'; document.body.dataset.view = 'race'; home.hidden = true; hud.hidden = false;
-  if (raceCourse !== courseId || !hud.innerHTML) { raceCourse = courseId; hud.innerHTML = hudTemplate(getCourse(courseId).definition, isPractice); }
+  if (raceCourse !== courseId || !hud.innerHTML) { raceCourse = courseId; hud.innerHTML = hudTemplate(getCourse(courseId).definition, isPractice) + partyHudTemplate(); }
   scene?.showCourse(getCourse(courseId).definition);
 }
 function showResults(players: PlayerSnapshot[], selfId: string, courseId: string, startTick: number, isPractice: boolean) {
@@ -164,6 +166,15 @@ function updateHud(now: number, players: PlayerSnapshot[], localId: string, elap
   const local = players.find(v => v.playerId === localId); if (!local) return;
   const time = document.querySelector('#race-time'); if (!time) return;
   const course = getCourse(raceCourse).definition;
+  const event = partyEvent(countdown > 0 ? 0 : elapsed), party = document.querySelector<HTMLElement>('#party-event')!;
+  party.hidden = event.kind === 'calm'; party.classList.toggle('warning', event.warning); party.style.setProperty('--event-color', event.color);
+  const partyKey = `${event.kind}-${event.warning}`;
+  if (partyKey !== previousParty) { previousParty = partyKey; if (event.kind !== 'calm') audio.tone(event.warning ? 420 : 740, .2); }
+  party.innerHTML = `<span>${event.warning ? 'INCOMING CHAOS' : 'FLOCK-WIDE EVENT'}</span><strong>${event.name} <i>${Math.ceil(event.remaining)}</i></strong><small>${event.warning ? `Starts in ${Math.ceil(event.remaining)}… get ready!` : event.detail}</small>`;
+  const powers = document.querySelector<HTMLElement>('#power-status')!;
+  const boost = Math.max(0, (local.boostUntilTick - local.simulationTick) / 60), shield = Math.max(0, (local.shieldUntilTick - local.simulationTick) / 60);
+  powers.innerHTML = `${boost ? `<span class="boost-power">✦ ROCKET BOOST <b>${boost.toFixed(1)}s</b></span>` : ''}${shield ? `<span class="shield-power">◈ BUBBLE SHIELD <b>${shield.toFixed(1)}s</b></span>` : ''}`;
+  if (local.pickupMask !== previousPickupMask) { previousPickupMask = local.pickupMask; audio.tone(1100, .16); }
   time.textContent = formatTime(local.status === 'finished' ? finishSeconds(local, practice ? 0 : connection.room?.state.startTick ?? 0) : elapsed);
   document.querySelector('#race-speed')!.textContent = String(Math.round(local.speed));
   document.querySelector('#checkpoint-text')!.textContent = `${local.checkpointIndex} / ${course.checkpoints.length}`;

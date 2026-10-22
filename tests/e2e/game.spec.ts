@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { COURSES, getCourse } from '../../shared/courses';
 
 test('renders the reference-inspired home, six open courses, settings and flight lesson', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
@@ -12,6 +13,8 @@ test('renders the reference-inspired home, six open courses, settings and flight
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByLabel('Visual quality')).toBeVisible();
   expect(errors).toEqual([]);
+  const browserHashes = await page.evaluate(async () => { const path = '/shared/courses.ts'; const { COURSES, getCourse } = await import(path); return COURSES.map((c: { id: string }) => getCourse(c.id).hash); });
+  expect(browserHashes).toEqual(COURSES.map(c => getCourse(c.id).hash));
 });
 
 test('practice flies, a held key does not auto-flap, crashes respawn, and restart clears state', async ({ page }) => {
@@ -77,4 +80,15 @@ test('leaving a closed connection returns immediately instead of hanging the men
     return connection.room === undefined;
   });
   expect(result).toBe(true);
+});
+
+test('a practice race announces and applies its first shared party event', async ({ page }) => {
+  await page.goto('/?webgl=1');
+  await expect(page.locator('body')).toHaveAttribute('data-renderer', 'WebGL2', { timeout: 45000 });
+  await page.getByRole('button', { name: 'Solo practice' }).click();
+  await expect(page.locator('#party-event')).toContainText('INCOMING CHAOS', { timeout: 23000 });
+  await expect(page.locator('#party-event')).toContainText('TURBO FLOCK');
+  await expect(page.locator('#party-event')).toContainText('FLOCK-WIDE EVENT', { timeout: 6000 });
+  await page.waitForFunction(() => (window as any).__flap.practice.speed > 20, { timeout: 8000 });
+  await expect(page.locator('#party-event')).toContainText('TURBO FLOCK');
 });

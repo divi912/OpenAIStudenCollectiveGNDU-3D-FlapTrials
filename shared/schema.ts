@@ -7,12 +7,13 @@ export class FlightInput extends Schema {
 }
 defineTypes(FlightInput, { sequence: 'uint32', tick: 'uint32', steer: 'int8', flapPressed: 'boolean', diveHeld: 'boolean', raceId: 'uint32' });
 
-export const SIM_FIELDS = ['playerId', 'x', 'y', 'z', 'vx', 'vy', 'speed', 'checkpointIndex', 'sectionProgress', 'crashCount', 'status', 'nextFlapTick', 'respawnTick', 'finishTick', 'finishFraction', 'lastProcessedSequence', 'simulationTick', 'crashCause'] as const;
+export const SIM_FIELDS = ['playerId', 'x', 'y', 'z', 'vx', 'vy', 'speed', 'checkpointIndex', 'sectionProgress', 'crashCount', 'status', 'nextFlapTick', 'respawnTick', 'finishTick', 'finishFraction', 'lastProcessedSequence', 'simulationTick', 'crashCause', 'boostUntilTick', 'shieldUntilTick', 'pickupMask'] as const;
 export class PlayerSchema extends Schema implements RacerState {
   playerId = ''; x = 0; y = 6; z = 0; vx = 0; vy = 0; speed = 16;
   checkpointIndex = 0; sectionProgress = 0; crashCount = 0; status: RacerStatus = 'racing';
   nextFlapTick = 0; respawnTick = 0; finishTick = -1; finishFraction = 0; lastProcessedSequence = -1; simulationTick = -1;
   crashCause = '';
+  boostUntilTick = 0; shieldUntilTick = 0; pickupMask = 0;
   name = 'Little Bird'; color = '#ffcc42'; ready = false; loaded = false; connected = true;
   reset() { Object.assign(this, createRacer(this.playerId)); this.ready = false; this.loaded = false; }
 }
@@ -22,6 +23,7 @@ defineTypes(PlayerSchema, {
   nextFlapTick: 'float64', respawnTick: 'float64', finishTick: 'float64', finishFraction: 'float64', lastProcessedSequence: 'float64', simulationTick: 'float64',
   name: 'string', color: 'string', ready: 'boolean', loaded: 'boolean', connected: 'boolean',
   crashCause: 'string',
+  boostUntilTick: 'float64', shieldUntilTick: 'float64', pickupMask: 'uint32',
 });
 export class RaceSchema extends Schema {
   code = ''; raceId = 1; phase: RoomPhase = 'lobby'; hostId = ''; isPublic = false;
