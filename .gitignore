@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.tools/
+.cache/
+test-results/
+playwright-report/
+.env.local
+.colyseus-cloud.json
+*.log
+*.blend1
+

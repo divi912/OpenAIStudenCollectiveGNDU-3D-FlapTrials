@@ -1,0 +1,227 @@
+import './styles.css';
+import { GameScene } from './game/scene';
+import { Controls } from './game/input';
+import { GameAudio } from './game/audio';
+import { Connection, SERVER_URL } from './network/connection';
+import { COURSES, getCourse } from '../shared/courses';
+import { createRacer, stepRacer } from '../shared/physics';
+import { DT, PHYSICS_VERSION, finishSeconds, rankRacers, type PlayerSnapshot, type RacerState } from '../shared/protocol';
+import { preferences, savePreferences, personalBest } from './storage';
+import { homeTemplate, courseCards, profileModal, helpModal, settingsModal, lobbyModal, hudTemplate, resultsModal, formatTime, icon, escapeHtml } from './ui';
+
+const app = document.querySelector<HTMLDivElement>('#app')!;
+app.innerHTML = '<canvas id="world" class="world-canvas" aria-label="Flap Trials 3D world"></canvas><div id="home"></div><div id="hud" hidden></div><div id="modal"></div><div id="toast" role="status" aria-live="polite"></div><div id="boot-note">Warming up the wings…</div>';
+const home = document.querySelector<HTMLDivElement>('#home')!, hud = document.querySelector<HTMLDivElement>('#hud')!, modal = document.querySelector<HTMLDivElement>('#modal')!, toastElement = document.querySelector<HTMLDivElement>('#toast')!;
+const p = preferences(), controls = new Controls(), audio = new GameAudio(), connection = new Connection();
+audio.volume = p.volume;
+let selected = COURSES[0].id;
+let scene: GameScene | undefined;
+let practice: PlayerSnapshot | undefined;
+let practiceTick = 0, practiceStartTime = 0, accumulator = 0;
+let view: 'home' | 'race' = 'home';
+let modalKind = '', lobbySignature = '', raceCourse = '', resultsKey = '';
+let previousCrashCount = 0, previousCheckpoint = 0, finishSoundPlayed = false;
+let previousTime = performance.now(), lastHud = 0, toastTimer = 0, previousCountdown = -1;
+let debug = new URLSearchParams(location.search).has('debug');
+let cueUntil = 0;
+
+function toast(message: string) {
+  toastElement.textContent = message; toastElement.classList.add('show'); clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => toastElement.classList.remove('show'), 4500);
+}
+function setModal(html: string, kind: string) {
+  modal.innerHTML = html; modalKind = kind; controls.enabled = false; controls.clear();
+  if (html) {
+    const first = modal.querySelector<HTMLElement>('input, button:not(.modal-close), select'); setTimeout(() => first?.focus({ preventScroll: true }), 0);
+  }
+}
+function closeModal() { if (modalKind === 'lobby') return; setModal('', ''); controls.enabled = view === 'race'; }
+function showHome() {
+  view = 'home'; practice = undefined; practiceTick = 0; controls.enabled = false; controls.clear();
+  document.body.dataset.view = 'home'; home.hidden = false; hud.hidden = true; hud.innerHTML = '';
+  home.innerHTML = homeTemplate(selected); setModal('', ''); scene?.showMenu(); resultsKey = ''; raceCourse = '';
+  void updateServerStatus();
+}
+function resetFeedback() { previousCrashCount = 0; previousCheckpoint = 0; finishSoundPlayed = false; previousCountdown = -1; cueUntil = 0; resultsKey = ''; }
+function startPractice() {
+  if (!scene?.ready) { toast('The sky is almost ready. Give it a moment.'); return; }
+  audio.unlock(); savePreferences(p); resetFeedback(); practiceTick = 0; accumulator = 0;
+  practice = { ...createRacer('practice'), name: p.name, color: p.color, ready: true, loaded: true, connected: true };
+  practiceStartTime = performance.now() + 3000;
+  openRace(selected, true); closeModal(); controls.enabled = true;
+}
+function openRace(courseId: string, isPractice: boolean) {
+  view = 'race'; document.body.dataset.view = 'race'; home.hidden = true; hud.hidden = false;
+  if (raceCourse !== courseId || !hud.innerHTML) { raceCourse = courseId; hud.innerHTML = hudTemplate(getCourse(courseId).definition, isPractice); }
+  scene?.showCourse(getCourse(courseId).definition);
+}
+function showResults(players: PlayerSnapshot[], selfId: string, courseId: string, startTick: number, isPractice: boolean) {
+  const key = isPractice ? `practice-${practiceStartTime}` : `online-${connection.room?.state.raceId}`;
+  if (resultsKey === key) return; resultsKey = key;
+  const course = getCourse(courseId).definition;
+  const me = players.find(v => v.playerId === selfId);
+  let pb: number | null = null;
+  if (me?.status === 'finished') {
+    pb = personalBest(courseId, course.version, PHYSICS_VERSION, isPractice ? 'practice' : 'race', finishSeconds(me, startTick));
+    if (!finishSoundPlayed) { audio.finish(); finishSoundPlayed = true; }
+  }
+  setModal(resultsModal(players, selfId, course, startTick, isPractice, pb), 'results');
+}
+async function leave() { await connection.leave(); showHome(); }
+connection.notice = toast;
+connection.lost = () => { toast('You left the room. Your wings are always welcome back.'); showHome(); };
+connection.changed = () => {
+  const room = connection.room; if (!room) return;
+  const s = room.state;
+  if (s.phase === 'lobby') {
+    if (view !== 'home') { showHome(); resetFeedback(); }
+    const signature = JSON.stringify([s.courseId, s.hostId, s.raceId, !!s.deadline, [...s.players.values()].map(v => [v.playerId, v.ready, v.connected])]);
+    if (modalKind === 'settings' || modalKind === 'help') return;
+    if (signature !== lobbySignature || modalKind !== 'lobby') { lobbySignature = signature; setModal(lobbyModal(s, room.sessionId), 'lobby'); }
+  } else if (s.phase === 'loading') {
+    if (view !== 'race' || raceCourse !== s.courseId) { resetFeedback(); openRace(s.courseId, false); setModal('', ''); }
+    if (scene?.ready) connection.action('loaded');
+  } else if (s.phase === 'countdown' || s.phase === 'racing') {
+    if (view !== 'race' || raceCourse !== s.courseId) openRace(s.courseId, false);
+    if (modalKind === 'lobby' || modalKind === 'loading') closeModal();
+    controls.enabled = !modalKind;
+  } else if (s.phase === 'results') {
+    showResults([...s.players.values()].map(v => v.toJSON() as PlayerSnapshot), room.sessionId, s.courseId, s.startTick, false);
+  }
+};
+controls.onFlap = () => audio.flap();
+controls.onRestart = () => { if (practice && !modalKind) startPractice(); };
+controls.onMenu = () => { audio.unlock(); if (modalKind === 'settings' || modalKind === 'help') closeModal(); else if (!modalKind || modalKind === 'lobby') setModal(settingsModal(p, scene?.renderer ?? 'Loading', view === 'race'), 'settings'); };
+
+document.addEventListener('click', async event => {
+  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-action]');
+  if (!target || target.hasAttribute('disabled')) return;
+  audio.unlock(); const action = target.dataset.action;
+  switch (action) {
+    case 'home': if (!connection.room && view === 'home') closeModal(); break;
+    case 'help': setModal(helpModal(), 'help'); break;
+    case 'settings': setModal(settingsModal(p, scene?.renderer ?? 'Loading', view === 'race'), 'settings'); break;
+    case 'close': if (modalKind === 'lobby' || modalKind === 'results') await leave(); else if (connection.room?.state.phase === 'lobby') { lobbySignature = ''; modalKind = ''; connection.changed(); } else closeModal(); break;
+    case 'practice': startPractice(); break;
+    case 'course': selected = target.dataset.course!; document.querySelector('#course-grid')!.innerHTML = courseCards(selected); break;
+    case 'quick': case 'create': case 'join': setModal(profileModal(action, p), 'profile'); break;
+    case 'color':
+      p.color = target.dataset.color!; savePreferences(p);
+      for (const button of modal.querySelectorAll<HTMLButtonElement>('.color-option')) { const chosen = button.dataset.color === p.color; button.classList.toggle('chosen', chosen); button.setAttribute('aria-pressed', String(chosen)); button.innerHTML = chosen ? icon('check', 19) : ''; }
+      break;
+    case 'lobby-course': connection.action('map', target.dataset.course); break;
+    case 'copy':
+      try { await navigator.clipboard.writeText(connection.room?.state.code ?? ''); toast('Room code copied. Invite your flock!'); } catch { toast(`Your room code is ${connection.room?.state.code}.`); }
+      break;
+    case 'ready': connection.action('ready', !connection.room?.state.players.get(connection.room.sessionId)?.ready); break;
+    case 'start': connection.action('start'); break;
+    case 'leave': await leave(); break;
+    case 'again': if (practice) startPractice(); else { resultsKey = ''; connection.action('again'); } break;
+    case 'change-map':
+      if (practice) { showHome(); document.querySelector('#courses-title')?.scrollIntoView({ behavior: p.reducedMotion ? 'instant' : 'smooth', block: 'center' }); }
+      else { resultsKey = ''; connection.action('again'); }
+      break;
+  }
+});
+document.addEventListener('submit', async event => {
+  const form = event.target as HTMLFormElement; if (form.id !== 'profile-form') return;
+  event.preventDefault(); const data = new FormData(form); p.name = String(data.get('name') || 'Little Bird').trim().slice(0, 20); savePreferences(p);
+  const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]')!, error = form.querySelector<HTMLParagraphElement>('#form-error')!;
+  submit.disabled = true; submit.textContent = 'Finding your nest…'; error.textContent = '';
+  try {
+    await connection.connect(form.dataset.mode as 'create' | 'quick' | 'join', p.name, p.color, String(data.get('code') ?? '').trim(), selected);
+  } catch (cause) {
+    error.textContent = cause instanceof Error ? (cause.message.includes('fetch') || cause.message.includes('Network') ? 'The multiplayer server is taking a breather. Make sure it is running, or try solo practice.' : cause.message) : 'Could not connect. Please try again.';
+    submit.disabled = false; submit.innerHTML = `Try again ${icon('arrow')}`;
+  }
+});
+document.addEventListener('input', event => {
+  const input = event.target as HTMLInputElement;
+  if (input.id === 'volume') { p.volume = Number(input.value); audio.volume = p.volume; }
+  else if (input.id === 'quality') p.quality = input.value as typeof p.quality;
+  else if (input.id === 'reduced-motion') p.reducedMotion = input.checked;
+  else return;
+  savePreferences(p); scene?.setPreferences(p);
+});
+document.addEventListener('keydown', event => {
+  if (event.code === 'F3') { event.preventDefault(); debug = !debug; }
+  if (event.key === 'Tab' && modalKind) {
+    const items = [...modal.querySelectorAll<HTMLElement>('button:not([disabled]), input, select, a[href]')];
+    if (!items.length) return;
+    if (event.shiftKey && document.activeElement === items[0]) { event.preventDefault(); items.at(-1)?.focus(); }
+    else if (!event.shiftKey && document.activeElement === items.at(-1)) { event.preventDefault(); items[0].focus(); }
+  }
+});
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { previousTime = performance.now(); accumulator = 0; } });
+
+async function updateServerStatus() {
+  const text = document.querySelector('#server-status-text'); if (!text) return;
+  try { const response = await fetch(`${SERVER_URL}/health`, { signal: AbortSignal.timeout(2500) }); if (!response.ok) throw new Error('offline'); text.textContent = 'The sky is open'; document.querySelector('.server-status')?.classList.add('online'); }
+  catch { text.textContent = 'Solo practice ready'; document.querySelector('.server-status')?.classList.remove('online'); }
+}
+function cue(html: string, duration = 0) { const el = document.querySelector('#center-cue'); if (el) el.innerHTML = html; if (duration) cueUntil = performance.now() + duration; }
+function updateHud(now: number, players: PlayerSnapshot[], localId: string, elapsed: number, countdown: number) {
+  const local = players.find(v => v.playerId === localId); if (!local) return;
+  const time = document.querySelector('#race-time'); if (!time) return;
+  const course = getCourse(raceCourse).definition;
+  time.textContent = formatTime(local.status === 'finished' ? finishSeconds(local, practice ? 0 : connection.room?.state.startTick ?? 0) : elapsed);
+  document.querySelector('#race-speed')!.textContent = String(Math.round(local.speed));
+  document.querySelector('#checkpoint-text')!.textContent = `${local.checkpointIndex} / ${course.checkpoints.length}`;
+  (document.querySelector('#course-progress') as HTMLElement).style.width = `${Math.max(0, Math.min(100, local.z / course.length * 100))}%`;
+  const rank = rankRacers(players), place = rank.findIndex(v => v.playerId === localId) + 1;
+  document.querySelector('#race-position')!.innerHTML = `${place}<small> / ${players.length}</small>`;
+  document.querySelector('#race-rivals')!.innerHTML = practice ? '<small>Just you and the sky.</small>' : rank.slice(0, 5).map((v, i) => `<div class="rival ${v.playerId === localId ? 'local' : ''}"><span>${i + 1}</span><i style="background:${v.color}"></i><strong>${escapeHtml(v.name)}</strong>${v.status === 'finished' ? icon('check', 12) : ''}</div>`).join('');
+  if (local.crashCount > previousCrashCount) {
+    previousCrashCount = local.crashCount; audio.crash(); scene?.crash(local);
+    cue(`<strong class="bonk">${local.crashCause === 'missed_gate' ? 'WHOOPS!' : 'BONK!'}</strong><span>${local.crashCause === 'missed_gate' ? 'Missed the gate! Fly through every opening.' : local.crashCause === 'bounds' ? 'Stay inside the pipeway. Back to your checkpoint.' : 'Back to your checkpoint. Keep those wings up.'}</span>`, 750);
+  }
+  if (local.checkpointIndex > previousCheckpoint) { previousCheckpoint = local.checkpointIndex; audio.checkpoint(); if (now > cueUntil) cue('<strong class="checkpoint-cue">Checkpoint!</strong><span>A little closer to the finish.</span>', 950); }
+  if (countdown > 0) {
+    const count = Math.ceil(countdown);
+    cue(`<span class="countdown-label">WINGS AT THE READY</span><strong class="countdown-number">${count}</strong><span>SPACE to flap · A / D to steer</span>`);
+    if (count !== previousCountdown) { previousCountdown = count; audio.tone(440, .1); }
+  } else if (previousCountdown > 0) { previousCountdown = 0; audio.tone(880, .3); cue('<strong class="countdown-number go">FLY!</strong>', 700); }
+  else if (now > cueUntil && local.status !== 'finished') cue('');
+  if (local.status === 'finished' && !practice && connection.room?.state.phase !== 'results') cue('<strong class="checkpoint-cue">You made it!</strong><span>Waiting for the rest of the flock…</span>');
+  const performanceEl = document.querySelector<HTMLElement>('#performance')!; performanceEl.hidden = !debug;
+  if (debug && scene) { const s = scene.stats; performanceEl.textContent = `${s.renderer} · ${s.fps} FPS · ${s.width}×${s.height} · ${s.drawCalls} draw calls · ${Math.round(s.triangles / 1000)}k tris · ${connection.latency} ms RTT`; }
+}
+function frame(now: number) {
+  const dt = Math.min(.25, (now - previousTime) / 1000); previousTime = now;
+  let players: PlayerSnapshot[] = [], localId = '', elapsed = 0, countdown = 0, raceSeconds = 0;
+  if (practice && view === 'race') {
+    countdown = Math.max(0, (practiceStartTime - now) / 1000);
+    if (!countdown && practice.status !== 'finished' && practice.status !== 'dnf') {
+      accumulator += dt;
+      while (accumulator >= DT) { stepRacer(practice, controls.read(practiceTick, practiceTick), getCourse(selected), practiceTick); practiceTick++; accumulator -= DT; }
+      if (practiceTick >= Math.max(180, getCourse(selected).definition.estimatedClearSeconds + 90) * 60) practice.status = 'dnf';
+    }
+    players = [practice]; localId = 'practice'; elapsed = practiceTick / 60; raceSeconds = elapsed;
+    if (practice.status === 'finished' || practice.status === 'dnf') showResults(players, localId, selected, 0, true);
+  } else if (connection.room) {
+    connection.step(now, (seq, tick) => controls.read(seq, tick));
+    const s = connection.room.state; players = connection.players(); localId = connection.room.sessionId;
+    const serverTick = s.tick;
+    countdown = s.phase === 'countdown' ? Math.max(0, (s.startTick - serverTick) / 60) : s.phase === 'loading' ? 3 : 0;
+    elapsed = s.phase === 'racing' || s.phase === 'results' ? Math.max(0, (serverTick - s.startTick) / 60) : 0;
+    raceSeconds = Math.max(0, ((connection.local?.simulationTick ?? serverTick) - s.startTick) / 60);
+  }
+  if (view === 'race' && now - lastHud > 80) { lastHud = now; updateHud(now, players, localId, elapsed, countdown); }
+  scene?.render(now, dt, players, localId, raceSeconds);
+  requestAnimationFrame(frame);
+}
+
+showHome();
+GameScene.create(document.querySelector<HTMLCanvasElement>('#world')!, p).then(result => {
+  scene = result; result.showMenu(); document.querySelector('#boot-note')?.remove();
+  document.body.dataset.renderer = result.renderer; requestAnimationFrame(frame);
+}).catch(error => {
+  console.error('Could not initialize the game renderer:', error);
+  const note = document.querySelector('#boot-note')!;
+  note.textContent = 'The 3D world could not load. Try a current browser with hardware acceleration enabled, then refresh.';
+  note.classList.add('boot-error');
+});
+setInterval(() => void updateServerStatus(), 30000);
+
+// Read-only diagnostics for browser automation and local profiling; never an authority channel.
+Object.defineProperty(window, '__flap', { get: () => ({ view, courseId: raceCourse || selected, renderer: scene?.renderer, stats: scene?.stats, practice: practice ? { ...practice } : undefined, room: connection.room?.state.toJSON(), sessionId: connection.room?.sessionId }) });

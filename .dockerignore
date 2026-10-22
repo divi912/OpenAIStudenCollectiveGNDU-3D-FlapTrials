@@ -1,0 +1,11 @@
+node_modules
+.git
+.tools
+.cache
+dist
+test-results
+playwright-report
+*.png
+assets/source
+.env*
+.colyseus-cloud.json

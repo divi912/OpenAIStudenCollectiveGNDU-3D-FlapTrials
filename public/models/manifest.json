@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "generator": "scripts/models.py",
+  "assets": [
+    {
+      "file": "bird.glb",
+      "bytes": 82444
+    },
+    {
+      "file": "obstacle-kit.glb",
+      "bytes": 28492
+    }
+  ]
+}
