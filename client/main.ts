@@ -1,20 +1,23 @@
 import './styles.css';
+import './cockpit.css';
 import { GameScene } from './game/scene';
 import { Controls } from './game/input';
 import { GameAudio } from './game/audio';
 import { partyEvent } from '../shared/party';
+import { hudTemplate, updateFlightInstruments } from './cockpit';
 import { Connection, SERVER_URL } from './network/connection';
 import { COURSES, getCourse } from '../shared/courses';
 import { createRacer, stepRacer } from '../shared/physics';
 import { DT, PHYSICS_VERSION, finishSeconds, rankRacers, type PlayerSnapshot, type RacerState } from '../shared/protocol';
 import { preferences, savePreferences, personalBest } from './storage';
-import { homeTemplate, courseCards, profileModal, helpModal, settingsModal, lobbyModal, hudTemplate, partyHudTemplate, resultsModal, formatTime, icon, escapeHtml } from './ui';
+import { homeTemplate, courseCards, profileModal, helpModal, settingsModal, lobbyModal, resultsModal, formatTime, icon, escapeHtml } from './ui';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 app.innerHTML = '<canvas id="world" class="world-canvas" aria-label="Flap Trials 3D world"></canvas><div id="home"></div><div id="hud" hidden></div><div id="modal"></div><div id="toast" role="status" aria-live="polite"></div><div id="boot-note">Warming up the wings…</div>';
 const home = document.querySelector<HTMLDivElement>('#home')!, hud = document.querySelector<HTMLDivElement>('#hud')!, modal = document.querySelector<HTMLDivElement>('#modal')!, toastElement = document.querySelector<HTMLDivElement>('#toast')!;
 const p = preferences(), controls = new Controls(), audio = new GameAudio(), connection = new Connection();
 audio.volume = p.volume;
+document.body.dataset.reducedMotion = String(p.reducedMotion);
 let selected = COURSES[0].id;
 let scene: GameScene | undefined;
 let practice: PlayerSnapshot | undefined;
@@ -26,6 +29,7 @@ let previousTime = performance.now(), lastHud = 0, toastTimer = 0, previousCount
 let debug = new URLSearchParams(location.search).has('debug');
 let cueUntil = 0;
 let previousParty = '', previousPickupMask = 0;
+let previousTricks = 0, previousGates = 0;
 
 function toast(message: string) {
   toastElement.textContent = message; toastElement.classList.add('show'); clearTimeout(toastTimer);
@@ -44,7 +48,7 @@ function showHome() {
   home.innerHTML = homeTemplate(selected); setModal('', ''); scene?.showMenu(); resultsKey = ''; raceCourse = '';
   void updateServerStatus();
 }
-function resetFeedback() { previousCrashCount = 0; previousCheckpoint = 0; finishSoundPlayed = false; previousCountdown = -1; cueUntil = 0; resultsKey = ''; previousParty = ''; previousPickupMask = 0; }
+function resetFeedback() { previousCrashCount = 0; previousCheckpoint = 0; finishSoundPlayed = false; previousCountdown = -1; cueUntil = 0; resultsKey = ''; previousParty = ''; previousPickupMask = 0; previousTricks = 0; previousGates = 0; }
 function startPractice() {
   if (!scene?.ready) { toast('The sky is almost ready. Give it a moment.'); return; }
   audio.unlock(); savePreferences(p); resetFeedback(); practiceTick = 0; accumulator = 0;
@@ -54,7 +58,7 @@ function startPractice() {
 }
 function openRace(courseId: string, isPractice: boolean) {
   view = 'race'; document.body.dataset.view = 'race'; home.hidden = true; hud.hidden = false;
-  if (raceCourse !== courseId || !hud.innerHTML) { raceCourse = courseId; hud.innerHTML = hudTemplate(getCourse(courseId).definition, isPractice) + partyHudTemplate(); }
+  if (raceCourse !== courseId || !hud.innerHTML) { raceCourse = courseId; hud.innerHTML = hudTemplate(getCourse(courseId).definition, isPractice); }
   scene?.showCourse(getCourse(courseId).definition);
 }
 function showResults(players: PlayerSnapshot[], selfId: string, courseId: string, startTick: number, isPractice: boolean) {
@@ -68,6 +72,7 @@ function showResults(players: PlayerSnapshot[], selfId: string, courseId: string
     if (!finishSoundPlayed) { audio.finish(); finishSoundPlayed = true; }
   }
   setModal(resultsModal(players, selfId, course, startTick, isPractice, pb), 'results');
+  if (me) modal.querySelector('.results-summary')?.insertAdjacentHTML('afterend', `<div class="result-flight-stats"><span><b>${me.styleScore.toLocaleString()}</b>STYLE POINTS</span><span><b>${me.trickCount}</b>BARREL ROLLS</span><span><b>${me.bestStreak}</b>BEST CLEAN STREAK</span></div>`);
 }
 async function leave() { await connection.leave(); showHome(); }
 connection.notice = toast;
@@ -144,6 +149,7 @@ document.addEventListener('input', event => {
   else if (input.id === 'reduced-motion') p.reducedMotion = input.checked;
   else return;
   savePreferences(p); scene?.setPreferences(p);
+  document.body.dataset.reducedMotion = String(p.reducedMotion);
 });
 document.addEventListener('keydown', event => {
   if (event.code === 'F3') { event.preventDefault(); debug = !debug; }
@@ -162,18 +168,22 @@ async function updateServerStatus() {
   catch { text.textContent = 'Solo practice ready'; document.querySelector('.server-status')?.classList.remove('online'); }
 }
 function cue(html: string, duration = 0) { const el = document.querySelector('#center-cue'); if (el) el.innerHTML = html; if (duration) cueUntil = performance.now() + duration; }
-function updateHud(now: number, players: PlayerSnapshot[], localId: string, elapsed: number, countdown: number) {
+function updateHud(now: number, players: PlayerSnapshot[], localId: string, elapsed: number, countdown: number, hazardSeconds: number) {
   const local = players.find(v => v.playerId === localId); if (!local) return;
   const time = document.querySelector('#race-time'); if (!time) return;
   const course = getCourse(raceCourse).definition;
-  const event = partyEvent(countdown > 0 ? 0 : elapsed), party = document.querySelector<HTMLElement>('#party-event')!;
+  updateFlightInstruments(local, course, elapsed, countdown, hazardSeconds);
+  const reticle = document.querySelector<HTMLElement>('#gate-reticle')!, marker = scene?.gateMarker(local, hazardSeconds);
+  reticle.hidden = !marker; if (marker) { reticle.style.setProperty('--target-x', `${marker.x}%`); reticle.style.setProperty('--target-y', `${marker.y}%`); }
+  const event = partyEvent(countdown > 0 ? 0 : hazardSeconds), party = document.querySelector<HTMLElement>('#party-event')!;
   party.hidden = event.kind === 'calm'; party.classList.toggle('warning', event.warning); party.style.setProperty('--event-color', event.color);
+  document.querySelector('.cockpit')?.classList.toggle('party-active', event.kind !== 'calm');
   const partyKey = `${event.kind}-${event.warning}`;
   if (partyKey !== previousParty) { previousParty = partyKey; if (event.kind !== 'calm') audio.tone(event.warning ? 420 : 740, .2); }
   party.innerHTML = `<span>${event.warning ? 'INCOMING CHAOS' : 'FLOCK-WIDE EVENT'}</span><strong>${event.name} <i>${Math.ceil(event.remaining)}</i></strong><small>${event.warning ? `Starts in ${Math.ceil(event.remaining)}… get ready!` : event.detail}</small>`;
   const powers = document.querySelector<HTMLElement>('#power-status')!;
   const boost = Math.max(0, (local.boostUntilTick - local.simulationTick) / 60), shield = Math.max(0, (local.shieldUntilTick - local.simulationTick) / 60);
-  powers.innerHTML = `${boost ? `<span class="boost-power">✦ ROCKET BOOST <b>${boost.toFixed(1)}s</b></span>` : ''}${shield ? `<span class="shield-power">◈ BUBBLE SHIELD <b>${shield.toFixed(1)}s</b></span>` : ''}`;
+  powers.innerHTML = boost || shield ? `${boost ? `<span class="boost-power">✦ ROCKET <b>${boost.toFixed(1)}s</b></span>` : ''}${shield ? `<span class="shield-power">◈ BUBBLE <b>${shield.toFixed(1)}s</b></span>` : ''}` : '<small>Gold = boost · Blue = shield</small>';
   if (local.pickupMask !== previousPickupMask) { previousPickupMask = local.pickupMask; audio.tone(1100, .16); }
   time.textContent = formatTime(local.status === 'finished' ? finishSeconds(local, practice ? 0 : connection.room?.state.startTick ?? 0) : elapsed);
   document.querySelector('#race-speed')!.textContent = String(Math.round(local.speed));
@@ -184,12 +194,15 @@ function updateHud(now: number, players: PlayerSnapshot[], localId: string, elap
   document.querySelector('#race-rivals')!.innerHTML = practice ? '<small>Just you and the sky.</small>' : rank.slice(0, 5).map((v, i) => `<div class="rival ${v.playerId === localId ? 'local' : ''}"><span>${i + 1}</span><i style="background:${v.color}"></i><strong>${escapeHtml(v.name)}</strong>${v.status === 'finished' ? icon('check', 12) : ''}</div>`).join('');
   if (local.crashCount > previousCrashCount) {
     previousCrashCount = local.crashCount; audio.crash(); scene?.crash(local);
-    cue(`<strong class="bonk">${local.crashCause === 'missed_gate' ? 'WHOOPS!' : 'BONK!'}</strong><span>${local.crashCause === 'missed_gate' ? 'Missed the gate! Fly through every opening.' : local.crashCause === 'bounds' ? 'Stay inside the pipeway. Back to your checkpoint.' : 'Back to your checkpoint. Keep those wings up.'}</span>`, 750);
+    const joke = local.crashCause === 'missed_gate' ? 'NOT A DOOR!' : ['BONK!', 'EGGSCUSE ME!', 'FEATHER BENDER!'][local.crashCount % 3];
+    cue(`<div class="comic-stamp"><b>${joke}</b><small>${local.crashCause === 'missed_gate' ? 'The opening was over there. Try the Q / E roll!' : local.crashCause === 'bounds' ? 'The audience paid to watch you fly inside the arena.' : 'A brief disagreement with architecture. Back to your checkpoint.'}</small></div>`, 900);
   }
+  if (local.trickCount > previousTricks) { previousTricks = local.trickCount; audio.tone(900, .2); scene?.crash(local); cue('<div class="comic-stamp roll"><b>ROTISSERIE MODE!</b><small>One complete barrel roll. +200 style. Zero dignity lost.</small></div>', 1400); }
+  if (local.gatesCleared > previousGates) { previousGates = local.gatesCleared; if (local.cleanStreak >= 3 && local.cleanStreak % 3 === 0 && now > cueUntil) cue(`<div class="comic-stamp positive"><b>${local.cleanStreak >= 6 ? 'UNFLAPPABLE!' : 'FLAPULOUS!'}</b><small>${local.cleanStreak} clean gates in a row. The crowd is losing its feathers.</small></div>`, 1100); }
   if (local.checkpointIndex > previousCheckpoint) { previousCheckpoint = local.checkpointIndex; audio.checkpoint(); if (now > cueUntil) cue('<strong class="checkpoint-cue">Checkpoint!</strong><span>A little closer to the finish.</span>', 950); }
   if (countdown > 0) {
     const count = Math.ceil(countdown);
-    cue(`<span class="countdown-label">WINGS AT THE READY</span><strong class="countdown-number">${count}</strong><span>SPACE to flap · A / D to steer</span>`);
+    cue(`<span class="countdown-label">WINGS AT THE READY</span><strong class="countdown-number">${count}</strong><span>SPACE flap · A / D turn · W / S pitch · Q / E roll</span>`);
     if (count !== previousCountdown) { previousCountdown = count; audio.tone(440, .1); }
   } else if (previousCountdown > 0) { previousCountdown = 0; audio.tone(880, .3); cue('<strong class="countdown-number go">FLY!</strong>', 700); }
   else if (now > cueUntil && local.status !== 'finished') cue('');
@@ -217,7 +230,7 @@ function frame(now: number) {
     elapsed = s.phase === 'racing' || s.phase === 'results' ? Math.max(0, (serverTick - s.startTick) / 60) : 0;
     raceSeconds = Math.max(0, ((connection.local?.simulationTick ?? serverTick) - s.startTick) / 60);
   }
-  if (view === 'race' && now - lastHud > 80) { lastHud = now; updateHud(now, players, localId, elapsed, countdown); }
+  if (view === 'race' && now - lastHud > 80) { lastHud = now; updateHud(now, players, localId, elapsed, countdown, raceSeconds); }
   scene?.render(now, dt, players, localId, raceSeconds);
   requestAnimationFrame(frame);
 }

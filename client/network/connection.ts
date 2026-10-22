@@ -47,7 +47,7 @@ export class Connection {
             else s.simulationTick = room.state.tick;
           },
         });
-        if (!this.attached) { this.predictor!.attachAll('players', { mode: 'lerp', fields: ['x', 'y', 'z', 'vx', 'vy', 'speed'], snap: 8 }); this.attached = true; }
+        if (!this.attached) { this.predictor!.attachAll('players', { mode: 'lerp', fields: ['x', 'y', 'z', 'vx', 'vy', 'speed', 'heading', 'pitch', 'roll'], snap: 8 }); this.attached = true; }
       }
       this.changed();
     });
@@ -74,6 +74,7 @@ export class Connection {
       const source = id === this.room.sessionId && this.reconciler ? this.reconciler.state : player;
       for (const field of SIM_FIELDS) (p as unknown as Record<string, unknown>)[field] = source[field];
       p.x = this.predictor?.value(player, 'x') ?? player.x; p.y = this.predictor?.value(player, 'y') ?? player.y; p.z = this.predictor?.value(player, 'z') ?? player.z;
+      for (const angle of ['heading', 'pitch', 'roll'] as const) p[angle] = this.predictor?.value(player, angle) ?? source[angle];
       p.name = player.name; p.color = player.color; p.ready = player.ready; p.loaded = player.loaded; p.connected = player.connected;
       result.push(p);
     }

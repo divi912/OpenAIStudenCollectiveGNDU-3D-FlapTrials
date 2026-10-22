@@ -4,12 +4,12 @@ export const APERTURE_SHAPES: ApertureShape[] = ['circle', 'hexagon', 'oval', 'd
 export const isGate = (o: ObstacleDefinition) => !['gust', 'speed_zone', 'pickup'].includes(o.kind);
 
 const descriptions = [
-  ['skyline_sprint', 'Skyline Sprint', 'A little courage. A lot of sky.', 'EASY', 'Learn the rhythm. Thread generous rings above a sunlit sea of clouds.', '#67b4b0', '#c0e5e6', '#76b9a5', 55],
-  ['the_needle', 'The Needle', 'Small gaps. Big feelings.', 'PRECISE', 'Find your line through narrow pipes and alternating offset openings.', '#ddab75', '#f1ddba', '#bc9879', 70],
-  ['crosswind', 'Crosswind', 'Go against the whoosh.', 'INTERMEDIATE', 'Read the windsocks and counter-steer through sweeping gusts.', '#85a7c9', '#cbdff0', '#89a8bc', 80],
-  ['clockwork', 'Clockwork', 'Timing is everything.', 'ADVANCED', 'Moving shutters and rotating apertures. Pick your moment, keep your nerve.', '#b69bbf', '#dfd4e9', '#a999b4', 90],
-  ['terminal_velocity', 'Terminal Velocity', 'What goes down, must flap up.', 'ADVANCED', 'Trade altitude for speed, then earn it back through long climbs.', '#df957a', '#f4d3bb', '#c29480', 100],
-  ['featherless', 'Featherless', 'For the beautifully stubborn.', 'EXPERT', 'A little of everything, tightly packed. Brave birds can take the inside line.', '#92aa8c', '#dce4c6', '#99aa82', 110],
+  ['skyline_sprint', 'Skyline Sprint', 'A little courage. A lot of sky.', 'EASY', 'Learn flap rhythm and sweeping turns, then bank through forgiving twist slots.', '#67b4b0', '#c0e5e6', '#76b9a5', 55],
+  ['the_needle', 'The Needle', 'Small gaps. Big feelings.', 'PRECISE', 'Bank through alternating narrow slots and twisting tunnel sequences.', '#ddab75', '#f1ddba', '#bc9879', 70],
+  ['crosswind', 'Crosswind', 'Go against the whoosh.', 'INTERMEDIATE', 'Carve banked slaloms and hold your wings steady against sweeping gusts.', '#85a7c9', '#cbdff0', '#89a8bc', 80],
+  ['clockwork', 'Clockwork', 'Timing is everything.', 'ADVANCED', 'Time rotating apertures, pitch through shutters and thread banked twist corridors.', '#b69bbf', '#dfd4e9', '#a999b4', 90],
+  ['terminal_velocity', 'Terminal Velocity', 'What goes down, must flap up.', 'ADVANCED', 'Pitch through sweeping climbs and dives, saving momentum for angled slots.', '#df957a', '#f4d3bb', '#c29480', 100],
+  ['featherless', 'Featherless', 'For the beautifully stubborn.', 'EXPERT', 'Helix alignments, twisting shafts and compound banks through the sharpest curves.', '#92aa8c', '#dce4c6', '#99aa82', 110],
 ] as const;
 
 export const COURSES: CourseDefinition[] = descriptions.map((meta, index) => {
@@ -36,6 +36,20 @@ export const COURSES: CourseDefinition[] = descriptions.map((meta, index) => {
       amplitude: kind === 'shutter' ? 2.2 : 1.4, strength: i % 2 ? 7 : -7 });
   }
   let pickupIndex = 0;
+  for (const [j, gate] of obstacles.filter(isGate).entries()) {
+    gate.tilt = j % 3 === 1 ? Number(((j % 2 ? 1 : -1) * (.2 + index * .07)).toFixed(6)) : 0;
+    if (j % 6 === 3) {
+      gate.kind = 'twist_gate'; gate.shape = 'rectangle'; gate.width = index === 0 ? 1.28 : 1.16; gate.height = index === 0 ? 6 : 5.4;
+      gate.x = 0; gate.y = 7; gate.tilt = index === 1 && j % 12 > 6 ? Math.PI / 2 : index === 3 ? -.3 : 0;
+      if ([1, 3, 5].includes(index)) for (let stage = 1; stage <= 2; stage++) {
+        const z = gate.z + stage * 4.5;
+        if (checkpoints.some(cp => Math.abs(cp.z - z) < 22)) continue;
+        obstacles.push({ ...gate, id: `${gate.id}-twist-${stage}`, z, width: 1.35, tilt: gate.tilt + stage * .12 });
+      }
+    } else if (index === 5 && j % 4 !== 0) {
+      gate.x = Number((Math.sin(j * 1.2) * 3).toFixed(6)); gate.y = Number((6.5 + Math.cos(j * 1.2) * 2.3).toFixed(6));
+    }
+  }
   for (const gate of obstacles) {
     if (gate.shape === 'circle') gate.height = gate.width;
     if (gate.shape === 'oval') { gate.width = Number((gate.width * 1.25).toFixed(6)); gate.height = Number((gate.height * .72).toFixed(6)); }
@@ -56,11 +70,12 @@ export const COURSES: CourseDefinition[] = descriptions.map((meta, index) => {
   }
   return { id, name, subtitle, difficulty, difficultyIndex: index, description, color, sky, ground,
     estimatedClearSeconds, length, width: 24, floor: -2, ceiling: 17, finishY: 6,
-    version: '2.0.0', checkpoints, obstacles };
+    version: '3.0.0', path: { turn: [.45, .6, .75, .65, .7, .85][index], wavelength: [160, 145, 135, 140, 150, 120][index], lift: [.12, .16, .14, .19, .25, .22][index] }, checkpoints, obstacles };
 });
 
 export function compileCourse(definition: CourseDefinition): CompiledCourse {
   if (!Number.isFinite(definition.length) || definition.length <= 0 || !Number.isFinite(definition.width) || definition.width <= 0) throw new Error('Invalid course bounds');
+  if (definition.path && (![definition.path.turn, definition.path.wavelength, definition.path.lift].every(Number.isFinite) || definition.path.wavelength < 80 || Math.abs(definition.path.turn) > 1 || Math.abs(definition.path.lift) > .4)) throw new Error('Invalid course path');
   let last = 0;
   for (const cp of definition.checkpoints) {
     if (!Number.isFinite(cp.z) || cp.z <= last || cp.z >= definition.length) throw new Error('Checkpoints must be ordered inside the course');
@@ -70,12 +85,13 @@ export function compileCourse(definition: CourseDefinition): CompiledCourse {
   const ids = new Set<string>();
   const bins = new Map<number, ObstacleDefinition[]>();
   for (const o of definition.obstacles) {
-    if (ids.has(o.id) || !['ring', 'wall', 'shutter', 'rotating_gate', 'gust', 'speed_zone', 'pickup'].includes(o.kind)) throw new Error('Invalid obstacle identifier/kind');
+    if (ids.has(o.id) || !['ring', 'wall', 'shutter', 'rotating_gate', 'twist_gate', 'gust', 'speed_zone', 'pickup'].includes(o.kind)) throw new Error('Invalid obstacle identifier/kind');
     if (o.shape && !APERTURE_SHAPES.includes(o.shape)) throw new Error('Invalid aperture shape');
+    if (o.tilt !== undefined && !Number.isFinite(o.tilt)) throw new Error('Invalid gate tilt');
     if (o.kind === 'pickup' && (!['boost', 'shield'].includes(o.powerUp ?? '') || !Number.isInteger(o.pickupIndex) || o.pickupIndex! < 0 || o.pickupIndex! > 30)) throw new Error('Invalid pickup');
     ids.add(o.id);
     if (![o.x, o.y, o.z, o.width, o.height, o.thickness, o.period, o.phase, o.amplitude, o.strength].every(Number.isFinite)
-      || o.width <= 1 || o.height <= 1 || o.thickness <= 0 || o.z < 20 || o.z >= definition.length
+      || o.width <= .65 || o.height <= .65 || o.thickness <= 0 || o.z < 20 || o.z >= definition.length
       || (['shutter', 'rotating_gate'].includes(o.kind) && o.period <= 0)) throw new Error(`Invalid obstacle ${o.id}`);
     if (definition.checkpoints.some(cp => Math.abs(cp.z - o.z) < 20)) throw new Error('Obstacle overlaps safe checkpoint staging');
     for (let bin = Math.floor((o.z - 8) / 64); bin <= Math.floor((o.z + 8) / 64); bin++) {
@@ -94,7 +110,7 @@ export function getCourse(id: string): CompiledCourse { return COMPILED_COURSES.
 /** The same tick-derived aperture pose is used by graphics and collision. */
 export function obstaclePose(o: ObstacleDefinition, seconds: number): { x: number; y: number; angle: number } {
   const phase = seconds * Math.PI * 2 / o.period + o.phase;
-  return { x: o.x, y: o.y + (o.kind === 'shutter' ? Math.sin(phase) * o.amplitude : 0), angle: o.kind === 'rotating_gate' ? phase : 0 };
+  return { x: o.x, y: o.y + (o.kind === 'shutter' ? Math.sin(phase) * o.amplitude : 0), angle: (o.tilt ?? 0) + (o.kind === 'rotating_gate' ? phase : 0) };
 }
 
 export function obstacleBoxes(o: ObstacleDefinition, seconds: number): Box[] {

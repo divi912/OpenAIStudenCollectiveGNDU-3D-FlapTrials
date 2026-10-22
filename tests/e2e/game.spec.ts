@@ -92,3 +92,43 @@ test('a practice race announces and applies its first shared party event', async
   await page.waitForFunction(() => (window as any).__flap.practice.speed > 20, { timeout: 8000 });
   await expect(page.locator('#party-event')).toContainText('TURBO FLOCK');
 });
+
+test('pitch and roll keys change real flight state and cockpit panels remain aligned', async ({ page }) => {
+  await page.goto('/?webgl=1');
+  await expect(page.locator('body')).toHaveAttribute('data-renderer', 'WebGL2', { timeout: 45000 });
+  await page.getByRole('button', { name: 'Solo practice' }).click();
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 720 }]) {
+    await page.setViewportSize(viewport);
+    const top = await page.locator('.cockpit-top>.flight-card').evaluateAll(nodes => nodes.map(el => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; }));
+    expect(top).toHaveLength(3); expect(top[0].y).toBe(top[2].y); expect(top[0].height).toBe(top[2].height); expect(Math.abs(top[0].width - top[2].width)).toBeLessThan(1);
+    const bottom = await page.locator('.cockpit-bottom>.flight-card').evaluateAll(nodes => nodes.map(el => el.getBoundingClientRect().height));
+    expect(new Set(bottom).size).toBe(1);
+    const guidanceBottom = await page.locator('#gate-guidance').evaluate(el => el.getBoundingClientRect().bottom);
+    expect(guidanceBottom).toBeLessThan(viewport.height * .48);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  }
+  // Layout work can outlast an unattended flight. Start a fresh attempt for control checks.
+  await page.keyboard.press('KeyR');
+  await page.waitForFunction(() => (window as any).__flap.practice?.z > 1, { timeout: 10000 });
+  await page.keyboard.down('KeyQ');
+  await page.waitForFunction(() => (window as any).__flap.practice.roll > .6, { timeout: 3000 });
+  const rolled = await page.evaluate(() => (window as any).__flap.practice.roll); expect(rolled).toBeGreaterThan(.5);
+  await page.keyboard.up('KeyQ'); await page.keyboard.press('Space'); await page.keyboard.down('KeyW');
+  await page.waitForFunction(() => (window as any).__flap.practice.pitch > .12, { timeout: 3000 });
+  const pitched = await page.evaluate(() => (window as any).__flap.practice.pitch); expect(pitched).toBeGreaterThan(.1);
+  await page.keyboard.up('KeyW');
+  await expect(page.locator('#flight-roll')).not.toHaveText('0°');
+  await expect(page.locator('#gate-instruction')).not.toBeEmpty();
+});
+
+test('the in-game reduced-motion preference suppresses comic stamp animation', async ({ page }) => {
+  await page.goto('/?webgl=1');
+  await expect(page.locator('body')).toHaveAttribute('data-renderer', 'WebGL2', { timeout: 45000 });
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByLabel('Reduced camera motion').check();
+  await expect(page.locator('body')).toHaveAttribute('data-reduced-motion', 'true');
+  await page.getByRole('button', { name: 'All set' }).click();
+  await page.getByRole('button', { name: 'Solo practice' }).click();
+  await expect(page.locator('.comic-stamp')).toBeVisible({ timeout: 12000 });
+  expect(await page.locator('.comic-stamp').evaluate(el => getComputedStyle(el).animationName)).toBe('none');
+});

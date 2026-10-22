@@ -18,13 +18,19 @@ Choose **Solo practice** for an immediate offline race. To race together, use **
 | Key | Action |
 | --- | --- |
 | Space | One upward flap per press; holding does not repeat |
-| A / D or left/right arrows | Steer |
-| Shift or down arrow | Dive |
+| A / D or left/right arrows | Turn the bird's heading |
+| W / S or up/down arrows | Pitch up/down |
+| Q / E | Roll left/right; release to ease upright |
+| Shift | Dive |
 | R | Restart solo practice |
 | Esc | Open/close settings; online races keep running |
 | F3 | Toggle rendering/network diagnostics |
 
 Fly through every solid gate, then the golden checkpoint flags. Missing a mandatory gate also returns you to the previous checkpoint. Wind and golden jetstream zones are non-solid. Crashes take 0.6 seconds to respawn, and the clock keeps running. Every bird has the same hitbox and cannot collide with other racers.
+
+The 3D flight revision follows **curving, climbing centerlines** through the stadium. Turning changes the heading and travel vector; pitch aims the nose; roll changes lift and the clearance of the wings. Discrete flaps remain necessary. Automatic leveling and a small baseline arcade lift keep banked flight manageable. All birds share the same body sphere and two swept wing probes; cosmetics do not change clearance. Coral twist slots reward banking, and narrow angled tunnel sequences require coordinating pitch, roll and flap timing. Respawns reset heading, pitch and roll.
+
+The cockpit uses matching three-column top/bottom grids and paired side panels. It shows telemetry, bank/pitch instruments, next-opening distance and guidance, checkpoint progress, active powers, party warnings, bonks, clean streaks and style. Full barrel rolls and clean gates earn style points and comic effects. **Validated finish time still determines placement**; style points are for bragging rights. Reduced Motion also suppresses comic stamp animations.
 
 The party upgrade adds circular, oval, triangular, diamond, hexagonal and rectangular gates in tighter sequences. Gold crystals grant **2.5 seconds of Rocket Boost**; blue crystals grant a **4-second Bubble Shield** that forgives frame scrapes while still requiring a valid opening crossing. Pickups are personal to each racer, collected once per race, and active powers clear on a crash.
 
@@ -52,9 +58,9 @@ The asset generator uses Blender's Python interface without external add-ons. An
 
 ## Courses and architecture
 
-All six courses are open immediately: Skyline Sprint, The Needle, Crosswind, Clockwork, Terminal Velocity, and Featherless. They vary opening size, alignment, moving apertures, gusts, altitude and momentum requirements. The first release uses forward-running courses; general curved splines and a course editor are future work.
+All six courses are open immediately: Skyline Sprint, The Needle, Crosswind, Clockwork, Terminal Velocity, and Featherless. Every map now has its own turning/climbing path, tilted gates and roll-slot challenges. Needle, Clockwork and Featherless add multi-stage twist tunnels; Terminal emphasizes pitching climbs/dives; Crosswind combines banks with gusts. A user-facing course editor remains future work.
 
-- `shared`: course validation/compilation, deterministic movement, swept collision, protocol, schema, ranking.
+- `shared`: course validation/compilation, track frames/world transforms, deterministic angular flight, swept body/wing collision, protocol, schema, ranking.
 - `client`: Babylon scene, local prediction/reconciliation, remote interpolation, menus, HUD, keyboard controls and synthesized audio.
 - `server`: authoritative rooms, matchmaking, lobby/loading/countdown/race/results lifecycle, reconnection and race validation.
 - `scripts`: Blender generation, asset validation, browser inspection and legal-input load-test pilots.

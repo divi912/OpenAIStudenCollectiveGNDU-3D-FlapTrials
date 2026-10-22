@@ -1,5 +1,14 @@
 # Local verification — 2026-10-22
 
+## 3D flight and cockpit refinement
+
+- **52 unit/integration tests and 7 browser tests** pass, along with type checking, production build and asset validation. New coverage includes heading/pitch motion, real roll-dependent slot clearance, angular reset/replay, full-roll scoring without partial-bank farming, path/frame orthonormality, and exact agreement between Babylon quaternion orientation and shared wing probes.
+- Every final course completes with legal controls **within the real authoritative timeout**. Local deterministic pilot times: Skyline 52.6s; Needle 108.6s; Crosswind 92.7s; Clockwork 100.7s; Terminal 122.1s; Featherless 111.1s. The pilot uses pitch/roll/turn/flap inputs, never changes positions and does not bypass collision. These are route-reachability results, not human difficulty/comfort ratings.
+- Browser checks verify actual W/Q keyboard motion, matching top/bottom cockpit card geometry at **1440×900 and 1280×720**, both saved Reduced Motion and comic stamp behavior, all-six-course Node/Chromium hash equality, two-browser race startup, practice reset and party events. Fresh screenshots were inspected for the balanced cockpit, elevated clouds and comic effects.
+- A fresh production-server **70-second, 80-racer, 10-room** run sent **336,560 input frames**, and **all 80 racers finished** the revised Skyline course. Maximum sampled per-room p95 simulation callback was **0.164 ms**, pending queue depth **4**, server RSS **199 MB**. This includes angular flight and swept wing probes; it remains a local capacity test rather than an internet/long-soak guarantee.
+- Final review caught partial-bank trick scoring, different clocks for HUD moving-gate guidance versus rendered hazards, and the app preference not reaching comic-animation CSS. These are fixed with regressions. Stopwatch elapsed time remains separate from the predicted hazard time used by rendering, reticle and guidance.
+- The browser environment still lacks a WebGPU adapter. WebGL2 rendering is exercised; real-GPU WebGPU performance and human motion-comfort testing remain external validation. Earlier sections below preserve baseline evidence from prior versions.
+
 ## Party/stadium upgrade
 
 - **43 unit/integration tests** pass, including shaped-aperture clearance, rejecting circle-corner bypasses, distinct circle/oval proportions, event warnings and physics, one-time pickup collection, shield boundaries, boosted speed-zone interactions, and all-six-course legal-input completion.

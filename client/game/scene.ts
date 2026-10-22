@@ -8,6 +8,7 @@ import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight.js';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
+import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
 import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh.js';
 import type { InstancedMesh } from '@babylonjs/core/Meshes/instancedMesh.js';
 import { CreateBox } from '@babylonjs/core/Meshes/Builders/boxBuilder.js';
@@ -31,6 +32,7 @@ import type { Preferences } from '../storage';
 import { presentFrame } from './frame';
 import { garden, sceneryChunk, THEMES } from './scenery';
 import { partyEvent } from '../../shared/party';
+import { frameAt, trackToWorld, bodyRoll } from '../../shared/track';
 
 interface BirdVisual { root: TransformNode; wings: TransformNode[]; beak?: TransformNode; material?: PBRMaterial; meshes: AbstractMesh[]; shield: InstancedMesh }
 interface ObstacleVisual { definition: ObstacleDefinition; root: TransformNode; gem?: InstancedMesh }
@@ -67,7 +69,7 @@ export class GameScene {
   private streaks: InstancedMesh[] = [];
   private settings: Preferences;
   private instrumentation: SceneInstrumentation;
-  private puffs: { mesh: InstancedMesh; vx: number; vy: number; vz: number; life: number }[] = [];
+  private puffs: { mesh: InstancedMesh; vx: number; vy: number; vz: number; life: number; feather: boolean }[] = [];
 
   static async create(canvas: HTMLCanvasElement, settings: Preferences): Promise<GameScene> {
     let engine: AbstractEngine | undefined;
@@ -126,9 +128,9 @@ export class GameScene {
     this.sunMesh.scaling.set(24, 24, 24); this.sunMesh.position.set(-100, 90, 260);
     for (let i = 0; i < 24; i++) { const line = this.instance('rod', '#e0f7e8', this.menuRoot); line.parent = null; line.setEnabled(false); this.streaks.push(line); }
     for (let i = 0; i < 16; i++) {
-      const mesh = this.instance('cloud', '#fff7df', this.scene.transformNodes[0] ?? this.menuRoot);
+      const mesh = this.instance(i % 2 ? 'leaf' : 'star', ['#ffcf6d', '#fff1cc', '#e9a291'][i % 3], this.scene.transformNodes[0] ?? this.menuRoot);
       mesh.parent = null; mesh.setEnabled(false);
-      this.puffs.push({ mesh, vx: 0, vy: 0, vz: 0, life: 0 });
+      this.puffs.push({ mesh, vx: 0, vy: 0, vz: 0, life: 0, feather: !!(i % 2) });
     }
     this.ready = true;
   }
@@ -152,6 +154,12 @@ export class GameScene {
       else if (kind === 'rock') mesh = CreateSphere(key, { diameter: 1, segments: 4 }, this.scene);
       else if (kind === 'crowd' || kind === 'banner') mesh = CreatePlane(key, { size: 1 }, this.scene);
       else if (kind === 'gem') mesh = CreatePolyhedron(key, { type: 1, size: 1 }, this.scene);
+      else if (kind === 'star') {
+        mesh = new Mesh(key, this.scene); const data = new VertexData();
+        data.positions = [0, 0, 0]; data.normals = [0, 0, -1]; data.indices = [];
+        for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5, r = i % 2 ? .43 : 1; data.positions.push(Math.sin(a) * r, Math.cos(a) * r, 0); data.normals.push(0, 0, -1); data.indices.push(0, i + 1, (i + 1) % 10 + 1); }
+        data.applyToMesh(mesh); this.mat(color, false).backFaceCulling = false;
+      }
       else if (kind === 'hoop') { mesh = CreateTorus(key, { diameter: 2, thickness: .09, tessellation: 32 }, this.scene); mesh.bakeTransformIntoVertices(Matrix.RotationX(Math.PI / 2)); }
       else if (kind === 'island') mesh = CreateCylinder(key, { height: 1, diameterTop: 2, diameterBottom: 1.1, tessellation: 24 }, this.scene);
       else if (kind === 'cone' || kind === 'peak' || kind === 'grass') mesh = CreateCylinder(key, { height: 1, diameterTop: kind === 'cone' ? .3 : 0, diameterBottom: 1, tessellation: kind === 'peak' ? 9 : 8 }, this.scene);
@@ -245,7 +253,7 @@ export class GameScene {
     const blue = this.bird('blue', '#55bce7', parent); blue.root.position.set(-4, 1.5, 2); blue.root.scaling.setAll(.63); blue.root.rotation.y = .25;
     const pink = this.bird('pink', '#ed7773', parent); pink.root.position.set(3.8, 2.5, -1.2); pink.root.scaling.setAll(.56); pink.root.rotation.y = -.65;
     this.menuBirds.push(hero, blue, pink);
-    this.cloud(parent, -6.5, .2, 2, 1.4); this.cloud(parent, 4.7, -1.4, 3, 1.7); this.cloud(parent, 3.1, 5.6, -5, .85);
+    this.cloud(parent, -6.5, 5.2, -1, 1.4); this.cloud(parent, 4.7, 6.2, -7, 1.3); this.cloud(parent, 3.1, 5.6, -5, .85);
     this.cloud(parent, -5, 5.6, -5.5, 1.1);
     for (const x of [-4.4, 4.4]) {
       this.instance('pipe', '#efead6', parent, [x, 1.5, 1.1], [.1, 2.6, .1]);
@@ -286,9 +294,12 @@ export class GameScene {
       const chunk = new TransformNode(`chunk-${z}`, this.scene); chunk.parent = root; this.chunks.push({ root: chunk, z });
       sceneryChunk(this.instance.bind(this), chunk, course, z, this.decorRotors);
       for (const side of [-1, 1]) {
-        this.cloud(chunk, side * 39, -15 + (z % 5), z + 60, 10);
-        this.cloud(chunk, side * 70, 14, z + 10, 4.5);
+        this.cloud(chunk, side * 39, 29 + (z % 7), z + 60, 8);
+        this.cloud(chunk, side * 70, 44, z + 10, 6);
       }
+      const anchor = z + 48, f = frameAt(course, anchor);
+      for (const child of chunk.getChildren()) if (child instanceof TransformNode) child.position.z -= anchor;
+      chunk.position.set(...f.position); chunk.rotationQuaternion = Quaternion.RotationYawPitchRoll(f.yaw, -f.pitch, 0);
     }
     for (const o of course.obstacles) {
       const group = new TransformNode(o.id, this.scene); group.parent = root;
@@ -307,8 +318,8 @@ export class GameScene {
           const line = this.instance('rod', o.kind === 'gust' ? '#8ce4ed' : '#ffcf6d', group, [-2 + i * 1.5, 1, 0], [.1, 1.4, .1]); line.rotation.z = o.kind === 'gust' ? 1.3 : -.7;
         }
       } else {
-        const color = o.kind === 'rotating_gate' ? '#a28abd' : o.kind === 'shutter' ? '#d6a465' : THEMES[course.difficultyIndex].leaf;
-        const local = { ...o, kind: o.kind === 'wall' ? 'wall' as const : 'ring' as const, x: 0, y: 0, z: 0 };
+        const color = o.kind === 'twist_gate' ? '#df9a83' : o.kind === 'rotating_gate' ? '#a28abd' : o.kind === 'shutter' ? '#d6a465' : THEMES[course.difficultyIndex].leaf;
+        const local = { ...o, kind: o.kind === 'wall' ? 'wall' as const : 'ring' as const, x: 0, y: 0, z: 0, tilt: 0 };
         for (const box of obstacleBoxes(local, 0)) {
           const beam = this.instance('pipe', color, group, box.center, [box.half[1] * 2, box.half[0] * 2, box.half[2] * 2]); beam.rotation.z = box.angle! - Math.PI / 2;
           const trim = this.instance('rod', '#ffcf6d', group, [box.center[0], box.center[1], -o.thickness / 2 - .02], [.07, box.half[0] * 2, .07]); trim.rotation.z = beam.rotation.z;
@@ -326,6 +337,12 @@ export class GameScene {
         }
         // A visible direction marker sits above, outside the opening.
         for (const side of [-1, 1]) { const chevron = this.instance('rod', '#fff1cc', group, [side * .24, o.height / 2 + 1.3, 0], [.1, .7, .1]); chevron.rotation.z = side * .7; }
+        if (o.kind === 'twist_gate') {
+          for (const side of [-1, 1]) {
+            const arrow = this.instance('hoop', '#8ce4ed', group, [side * 1.6, 0, -.5], [.55, .55, .6]);
+            this.instance('star', '#ffcf6d', group, [side * 1.6, .55, -.51], [.16, .16, .16]); arrow.rotation.z = side * .5;
+          }
+        }
       }
       this.obstacles.push({ definition: o, root: group, gem });
     }
@@ -337,13 +354,16 @@ export class GameScene {
         for (let row = 0; row < 4; row++) for (let col = 0; col < 3; col++) this.instance('box', cp ? ((row + col) % 2 ? '#fff1c1' : '#e7c464') : ((row + col) % 2 ? '#fff5df' : '#355849'), group, [side * 11 + (col + .5) * .5 * -side, 13 - row * .5, z], [.5, .5, .1]);
       }
       this.instance('box', cp ? '#ecd27d' : '#f5f0df', group, [0, 14.5, z], [22, .3, .25]);
+      const f = frameAt(course, z); for (const child of group.getChildren()) if (child instanceof TransformNode) child.position.z -= z;
+      group.position.set(...f.position); group.rotationQuaternion = Quaternion.RotationYawPitchRoll(f.yaw, -f.pitch, 0);
     }
   }
   crash(position: RacerState): void {
+    const origin = this.course ? trackToWorld(this.course, position.x, position.y, position.z) : [position.x, position.y, position.z] as [number, number, number];
     for (let i = 0; i < this.puffs.length; i++) {
       const p = this.puffs[i], a = i * 2.399;
-      p.mesh.setEnabled(true); p.mesh.position.set(position.x, position.y, position.z);
-      p.vx = Math.cos(a) * (2 + i % 3); p.vy = 1.5 + (i % 4); p.vz = Math.sin(a) * 3; p.life = .55;
+      p.mesh.setEnabled(!this.settings.reducedMotion || i < 6); p.mesh.position.set(...origin);
+      p.vx = Math.cos(a) * (2 + i % 3); p.vy = 1.5 + (i % 4); p.vz = Math.sin(a) * 3; p.life = this.settings.reducedMotion ? .3 : .7;
     }
   }
   private animateBird(bird: BirdVisual, seconds: number, flap: number, bank = 0, pitch = 0) {
@@ -365,11 +385,11 @@ export class GameScene {
         let distance = 7;
         const behind = this.course?.obstacles.find(o => o.z < local.z && local.z - o.z < 8 && isGate(o));
         if (behind) distance = Math.max(3, local.z - behind.z - .7);
-        const snap = Math.abs(this.camera.position.z - local.z) > 25;
         const cameraY = this.settings.reducedMotion ? local.y + Math.max(-1.2, Math.min(1.2, (6.5 - local.y) * .65)) : local.y;
-        temp.set(local.x * .8, cameraY + 2.1, local.z - distance);
+        temp.set(...trackToWorld(this.course!, local.x * .8, cameraY + 2.1, local.z - distance));
+        const snap = Vector3.Distance(this.camera.position, temp) > 25;
         if (snap) this.follow.copyFrom(temp); else Vector3.LerpToRef(this.follow, temp, 1 - Math.exp(-dt * 12), this.follow);
-        temp.set(local.x * .6, cameraY + .45, local.z + 22);
+        temp.set(...trackToWorld(this.course!, local.x * .6, cameraY + .45, local.z + 22));
         Vector3.LerpToRef(this.look, temp, snap ? 1 : 1 - Math.exp(-dt * 9), this.look);
         this.camera.position.copyFrom(this.follow); this.camera.setTarget(this.look);
         for (const chunk of this.chunks) chunk.root.setEnabled(chunk.z > local.z - 200 && chunk.z < local.z + 330);
@@ -378,7 +398,7 @@ export class GameScene {
         this.camera.fov += (targetFov - this.camera.fov) * (1 - Math.exp(-dt * 3));
         for (let i = 0; i < this.streaks.length; i++) {
           const line = this.streaks[i]; line.setEnabled(boosted && !this.settings.reducedMotion);
-          if (boosted) { const a = i * 2.399; line.position.set(local.x + Math.cos(a) * (2.3 + i % 3), local.y + Math.sin(a) * (2.3 + i % 3), local.z + 10 - ((seconds * 35 + i * 3) % 23)); line.scaling.set(.015, 1.7, .015); line.rotation.x = Math.PI / 2; }
+          if (boosted) { const a = i * 2.399, f = frameAt(this.course!, local.z); line.position.set(...trackToWorld(this.course!, local.x + Math.cos(a) * (2.3 + i % 3), local.y + Math.sin(a) * (2.3 + i % 3), local.z + 10 - ((seconds * 35 + i * 3) % 23))); line.scaling.set(.015, 1.7, .015); line.rotationQuaternion = Quaternion.RotationYawPitchRoll(f.yaw, Math.PI / 2 - f.pitch, 0); }
         }
       }
       for (let i = 0; i < this.decorRotors.length; i++) this.decorRotors[i].rotation.z = seconds * (i % 2 ? -.45 : .45);
@@ -387,15 +407,17 @@ export class GameScene {
         const collected = o.kind === 'pickup' && local && !!(local.pickupMask & (1 << o.pickupIndex!));
         const active = !collected && (!local || (o.z > local.z - 30 && o.z < local.z + 300)); visual.root.setEnabled(active);
         if (!active) continue;
-        const pose = obstaclePose(o, raceSeconds); visual.root.position.set(pose.x, pose.y, o.z); visual.root.rotation.z = pose.angle;
+        const pose = obstaclePose(o, raceSeconds), f = frameAt(this.course!, o.z); visual.root.position.set(...trackToWorld(this.course!, pose.x, pose.y, o.z)); visual.root.rotationQuaternion = Quaternion.RotationYawPitchRoll(f.yaw, -f.pitch, pose.angle);
         if (visual.gem) { visual.gem.rotation.y = seconds * 1.8; visual.gem.position.y = Math.sin(seconds * 2.5 + o.z) * .17; }
       }
       const seen = new Set<string>();
       for (const p of players) {
         seen.add(p.playerId); let bird = this.birds.get(p.playerId);
         if (!bird) { bird = this.bird(p.playerId, p.color); bird.root.scaling.setAll(.43); this.birds.set(p.playerId, bird); }
-        bird.root.setEnabled(p.status !== 'dnf' && p.status !== 'crashed'); bird.root.position.set(p.x, p.y, p.z);
+        bird.root.setEnabled(p.status !== 'dnf' && p.status !== 'crashed'); bird.root.position.set(...trackToWorld(this.course!, p.x, p.y, p.z));
         this.animateBird(bird, seconds, .25 + Math.max(0, p.vy) * .035, -p.vx * .055, -p.vy * .025);
+        const f = frameAt(this.course!, p.z);
+        bird.root.rotationQuaternion = Quaternion.RotationYawPitchRoll(f.yaw, -f.pitch, 0).multiply(Quaternion.RotationYawPitchRoll(p.heading, -p.pitch, bodyRoll(p.heading, p.roll)));
         bird.shield.setEnabled(p.simulationTick < p.shieldUntilTick);
         const overlap = local && p.playerId !== localId && Math.abs(p.z - local.z) < 5 && Math.abs(p.x - local.x) < 1.4 && Math.abs(p.y - local.y) < 1.4;
         for (const mesh of bird.meshes) mesh.visibility = overlap ? .28 : 1;
@@ -404,7 +426,9 @@ export class GameScene {
     }
     for (const puff of this.puffs) if (puff.life > 0) {
       puff.life -= dt; puff.vy -= dt * 6; puff.mesh.position.addInPlaceFromFloats(puff.vx * dt, puff.vy * dt, puff.vz * dt);
-      puff.mesh.scaling.setAll(Math.max(.001, puff.life * .65)); if (puff.life <= 0) puff.mesh.setEnabled(false);
+      const size = Math.max(.001, puff.life); puff.mesh.scaling.set(size * .6, size * (puff.feather ? 1.4 : .6), puff.feather ? size * .16 : .05);
+      if (!this.settings.reducedMotion) puff.mesh.rotation.z += dt * 6;
+      if (puff.life <= 0) puff.mesh.setEnabled(false);
     }
     if (this.settings.quality === 'auto' && now - this.lastQualityCheck > 3000) {
       this.lastQualityCheck = now; const fps = this.engine.getFps();
@@ -414,5 +438,15 @@ export class GameScene {
     presentFrame(this.engine, this.scene);
   }
   private boxPose(mesh: InstancedMesh, box: Box) { mesh.position.set(...box.center); mesh.scaling.set(box.half[0] * 2, box.half[1] * 2, box.half[2] * 2); mesh.rotation.z = box.angle ?? 0; }
+  gateMarker(player: RacerState, seconds: number): { x: number; y: number } | undefined {
+    if (!this.course) return;
+    const gate = this.course.obstacles.find(o => isGate(o) && o.z > player.z + 1);
+    if (!gate || gate.z - player.z > 160) return;
+    const pose = obstaclePose(gate, seconds), world = Vector3.FromArray(trackToWorld(this.course, pose.x, pose.y, gate.z));
+    const width = this.engine.getRenderWidth(), height = this.engine.getRenderHeight();
+    const point = Vector3.Project(world, Matrix.Identity(), this.scene.getTransformMatrix(), this.camera.viewport.toGlobal(width, height));
+    const x = point.x / width * 100, y = point.y / height * 100;
+    if (point.z > 0 && point.z < 1 && x > 24 && x < 76 && y > 25 && y < 70) return { x, y };
+  }
   get stats() { return { mode: this.mode, courseId: this.course?.id, fps: Math.round(this.engine.getFps()), meshes: this.scene.getActiveMeshes().length, drawCalls: this.instrumentation.drawCallsCounter.current, triangles: this.scene.getActiveIndices() / 3, vertices: this.scene.getTotalVertices(), renderer: this.renderer, width: this.engine.getRenderWidth(), height: this.engine.getRenderHeight() }; }
 }

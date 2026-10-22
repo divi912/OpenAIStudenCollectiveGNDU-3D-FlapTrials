@@ -15,7 +15,7 @@ export class RaceRoom extends Room<{ state: RaceSchema; input: FlightInput }> {
   model!: GameSession;
   inputs = this.defineInput(FlightInput, {
     bufferMaxSize: 32,
-    sanitize: (f: FlightInput) => { f.steer = f.steer === -1 || f.steer === 1 ? f.steer : 0; },
+    sanitize: (f: FlightInput) => { f.steer = f.steer === -1 || f.steer === 1 ? f.steer : 0; f.pitch = f.pitch === -1 || f.pitch === 1 ? f.pitch : 0; f.roll = f.roll === -1 || f.roll === 1 ? f.roll : 0; },
     idle: true,
   });
   private commands = new Map<string, InputFrame>();
