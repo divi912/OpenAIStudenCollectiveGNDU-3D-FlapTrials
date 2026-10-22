@@ -1,5 +1,5 @@
-export interface Preferences { name: string; color: string; volume: number; quality: 'auto' | 'low' | 'high'; reducedMotion: boolean }
-const defaults: Preferences = { name: 'Little Bird', color: '#ffcc42', volume: .35, quality: 'auto', reducedMotion: false };
+export interface Preferences { name: string; color: string; volume: number; musicVolume: number; quality: 'auto' | 'low' | 'high'; reducedMotion: boolean }
+const defaults: Preferences = { name: 'Little Bird', color: '#ffcc42', volume: .35, musicVolume: .28, quality: 'auto', reducedMotion: false };
 export function preferences(): Preferences {
   try { return { ...defaults, ...JSON.parse(localStorage.getItem('flap.preferences') ?? '{}') }; } catch { return { ...defaults }; }
 }

@@ -1,5 +1,7 @@
 # Execution ledger — plan: docs/PLAN.md
 
+- Final touches: removed race telemetry, attitude and points panels; retained centered navigation and a powers-only strip. Replaced the old crowd atlas with solid vertex-colored Blender birds (278/94 triangles), single-draw thin-instance batches, distance LOD/culling and sparse low/adaptive quality. Added original 132 BPM music, baked once offline into one seamless 29-second buffer, with saved independent volume and hidden-tab suspension. This supersedes earlier atlas/HUD descriptions below.
+
 - Setup: empty directory with two reference PNGs, no prior repository or app. Initialized feat/flap-trials in the requested directory; no existing branch requires isolation.
 - Pre-flight: simulation is shared by practice, server and prediction. Course instances are immutable; graphics never decide race outcomes. Asset generation is build-time only.
 - Task 1: complete — 18 passing flight, collision, course-integrity and room-lifecycle tests.

@@ -117,7 +117,7 @@ test('pitch and roll keys change real flight state and cockpit panels remain ali
   await page.waitForFunction(() => (window as any).__flap.practice.pitch > .12, { timeout: 3000 });
   const pitched = await page.evaluate(() => (window as any).__flap.practice.pitch); expect(pitched).toBeGreaterThan(.1);
   await page.keyboard.up('KeyW');
-  await expect(page.locator('#flight-roll')).not.toHaveText('0°');
+  await expect(page.locator('.telemetry-panel,.attitude-panel,.cockpit-style')).toHaveCount(0);
   await expect(page.locator('#gate-instruction')).not.toBeEmpty();
 });
 

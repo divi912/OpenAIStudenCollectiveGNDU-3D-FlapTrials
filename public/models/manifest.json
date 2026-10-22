@@ -1,6 +1,9 @@
 {
-  "version": 2,
-  "generator": "scripts/models.py",
+  "version": 3,
+  "generator": [
+    "scripts/models.py",
+    "scripts/audience.py"
+  ],
   "assets": [
     {
       "file": "bird.glb",
@@ -13,6 +16,14 @@
     {
       "file": "obstacle-kit.glb",
       "bytes": 39256
+    },
+    {
+      "file": "audience.glb",
+      "bytes": 8764
+    },
+    {
+      "file": "audience-lod.glb",
+      "bytes": 4136
     }
   ]
 }

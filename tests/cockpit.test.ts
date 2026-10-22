@@ -1,10 +1,15 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { updateFlightInstruments } from '../client/cockpit';
+import { hudTemplate, updateFlightInstruments } from '../client/cockpit';
 import { COURSES } from '../shared/courses';
 import { createRacer } from '../shared/physics';
 import type { PlayerSnapshot } from '../shared/protocol';
 
 afterEach(() => vi.unstubAllGlobals());
+it('keeps navigation and powers without the telemetry, pitch or points panels', () => {
+  const html = hudTemplate(COURSES[0], true);
+  for (const removed of ['telemetry-panel', 'attitude-panel', 'cockpit-style', 'race-speed', 'flight-pitch', 'style-score']) expect(html).not.toContain(removed);
+  for (const retained of ['power-status', 'course-progress', 'race-time', 'race-rivals', 'gate-instruction']) expect(html).toContain(retained);
+});
 it('guides toward the rendered moving-gate phase rather than an older stopwatch snapshot', () => {
   const elements = new Map<string, { textContent: string; style: { setProperty: () => void }; classList: { toggle: () => void; remove: () => void } }>();
   vi.stubGlobal('document', { getElementById: (id: string) => {

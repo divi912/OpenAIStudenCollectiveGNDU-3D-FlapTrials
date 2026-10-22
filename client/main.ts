@@ -17,6 +17,7 @@ app.innerHTML = '<canvas id="world" class="world-canvas" aria-label="Flap Trials
 const home = document.querySelector<HTMLDivElement>('#home')!, hud = document.querySelector<HTMLDivElement>('#hud')!, modal = document.querySelector<HTMLDivElement>('#modal')!, toastElement = document.querySelector<HTMLDivElement>('#toast')!;
 const p = preferences(), controls = new Controls(), audio = new GameAudio(), connection = new Connection();
 audio.volume = p.volume;
+audio.musicVolume = p.musicVolume;
 document.body.dataset.reducedMotion = String(p.reducedMotion);
 let selected = COURSES[0].id;
 let scene: GameScene | undefined;
@@ -145,6 +146,7 @@ document.addEventListener('submit', async event => {
 document.addEventListener('input', event => {
   const input = event.target as HTMLInputElement;
   if (input.id === 'volume') { p.volume = Number(input.value); audio.volume = p.volume; }
+  else if (input.id === 'music-volume') { p.musicVolume = Number(input.value); audio.musicVolume = p.musicVolume; }
   else if (input.id === 'quality') p.quality = input.value as typeof p.quality;
   else if (input.id === 'reduced-motion') p.reducedMotion = input.checked;
   else return;
@@ -160,7 +162,7 @@ document.addEventListener('keydown', event => {
     else if (!event.shiftKey && document.activeElement === items.at(-1)) { event.preventDefault(); items[0].focus(); }
   }
 });
-document.addEventListener('visibilitychange', () => { if (!document.hidden) { previousTime = performance.now(); accumulator = 0; } });
+document.addEventListener('visibilitychange', () => { audio.setHidden(document.hidden); if (!document.hidden) { previousTime = performance.now(); accumulator = 0; } });
 
 async function updateServerStatus() {
   const text = document.querySelector('#server-status-text'); if (!text) return;
@@ -183,10 +185,10 @@ function updateHud(now: number, players: PlayerSnapshot[], localId: string, elap
   party.innerHTML = `<span>${event.warning ? 'INCOMING CHAOS' : 'FLOCK-WIDE EVENT'}</span><strong>${event.name} <i>${Math.ceil(event.remaining)}</i></strong><small>${event.warning ? `Starts in ${Math.ceil(event.remaining)}… get ready!` : event.detail}</small>`;
   const powers = document.querySelector<HTMLElement>('#power-status')!;
   const boost = Math.max(0, (local.boostUntilTick - local.simulationTick) / 60), shield = Math.max(0, (local.shieldUntilTick - local.simulationTick) / 60);
-  powers.innerHTML = boost || shield ? `${boost ? `<span class="boost-power">✦ ROCKET <b>${boost.toFixed(1)}s</b></span>` : ''}${shield ? `<span class="shield-power">◈ BUBBLE <b>${shield.toFixed(1)}s</b></span>` : ''}` : '<small>Gold = boost · Blue = shield</small>';
+  powers.innerHTML = `${boost ? `<span class="boost-power">✦ ROCKET <b>${boost.toFixed(1)}s</b></span>` : ''}${shield ? `<span class="shield-power">◈ BUBBLE <b>${shield.toFixed(1)}s</b></span>` : ''}`;
+  powers.hidden = !boost && !shield;
   if (local.pickupMask !== previousPickupMask) { previousPickupMask = local.pickupMask; audio.tone(1100, .16); }
   time.textContent = formatTime(local.status === 'finished' ? finishSeconds(local, practice ? 0 : connection.room?.state.startTick ?? 0) : elapsed);
-  document.querySelector('#race-speed')!.textContent = String(Math.round(local.speed));
   document.querySelector('#checkpoint-text')!.textContent = `${local.checkpointIndex} / ${course.checkpoints.length}`;
   (document.querySelector('#course-progress') as HTMLElement).style.width = `${Math.max(0, Math.min(100, local.z / course.length * 100))}%`;
   const rank = rankRacers(players), place = rank.findIndex(v => v.playerId === localId) + 1;
@@ -251,4 +253,4 @@ GameScene.create(document.querySelector<HTMLCanvasElement>('#world')!, p).then(r
 setInterval(() => void updateServerStatus(), 30000);
 
 // Read-only diagnostics for browser automation and local profiling; never an authority channel.
-Object.defineProperty(window, '__flap', { get: () => ({ view, courseId: raceCourse || selected, renderer: scene?.renderer, stats: scene?.stats, practice: practice ? { ...practice } : undefined, room: connection.room?.state.toJSON(), sessionId: connection.room?.sessionId }) });
+Object.defineProperty(window, '__flap', { get: () => ({ audio: audio.stats, view, courseId: raceCourse || selected, renderer: scene?.renderer, stats: scene?.stats, practice: practice ? { ...practice } : undefined, room: connection.room?.state.toJSON(), sessionId: connection.room?.sessionId }) });

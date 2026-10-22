@@ -1,5 +1,5 @@
 import { isGate, obstaclePose } from '../shared/courses';
-import { bodyRoll, frameAt, wrapAngle } from '../shared/track';
+import { bodyRoll } from '../shared/track';
 import type { CourseDefinition, PlayerSnapshot } from '../shared/protocol';
 import { birdMark, escapeHtml, icon } from './ui';
 
@@ -11,33 +11,22 @@ export function hudTemplate(course: CourseDefinition, practice: boolean): string
       <section class="flight-card position-panel"><div><span class="instrument-label">RACE POSITION</span><strong id="race-position">1<small> / 1</small></strong><small id="distance-left">${course.length} m to finish</small></div><button class="cockpit-menu" data-action="settings" aria-label="Race menu">${icon('settings', 22)}</button></section>
     </header>
     <aside class="flight-card cockpit-flock"><span class="instrument-label">${icon('people', 13)} THE FLOCK</span><div id="race-rivals"></div><p class="panel-footnote">Same wings. Questionable decisions.</p></aside>
-    <aside class="flight-card cockpit-style"><span class="instrument-label">STYLE POINTS</span><strong id="style-score">0</strong><div class="style-grid"><span><b id="bonk-count">0</b>BONKS</span><span><b id="trick-count">0</b>ROLLS</span><span><b id="streak-count">0</b>STREAK</span></div><p class="panel-footnote">Finish time wins. Style is bragging rights.</p></aside>
     <div class="party-event" id="party-event" role="status" hidden></div>
     <div class="gate-reticle" id="gate-reticle" hidden><i></i><span>NEXT</span></div>
     <div class="center-cue" id="center-cue" aria-live="polite"></div>
     <div class="gate-guidance" id="gate-guidance"><span class="instrument-label" id="gate-name">NEXT OPENING</span><strong id="gate-instruction">Find your line</strong><small id="next-checkpoint">Follow the golden checkpoint flags</small></div>
+    <div class="power-status" id="power-status" hidden></div>
     <footer class="cockpit-bottom">
-      <section class="flight-card telemetry-panel"><span class="instrument-label">FLIGHT TELEMETRY</span><div class="telemetry-grid"><span><b id="race-speed">16</b><small>SPEED · m/s</small></span><span><b id="flight-altitude">8</b><small>HEIGHT · m</small></span><span><b id="flight-climb">0.0</b><small>CLIMB · m/s</small></span></div><div class="telemetry-strip"><span>HEADING <b id="flight-heading">000°</b></span><span id="flight-condition">LEVEL FLIGHT</span></div></section>
       <section class="flight-card navigation-panel"><div class="navigation-title"><span class="instrument-label">COURSE PROGRESS</span><strong id="checkpoint-text">0 / ${course.checkpoints.length}</strong></div><div class="progress-track"><div id="course-progress"></div></div><div class="flight-bindings"><span><kbd>SPACE</kbd> flap</span><span><kbd>A D</kbd> turn</span><span><kbd>W S</kbd> pitch</span><span><kbd>Q E</kbd> roll</span><span><kbd>SHIFT</kbd> dive</span></div><p class="panel-footnote">Flap for height. Bank through gaps. Try to look intentional.</p></section>
-      <section class="flight-card attitude-panel"><div class="attitude-row"><div class="attitude-dial" aria-label="Bird bank indicator"><i class="dial-horizon"></i><div id="attitude-bird">${icon('feather', 23)}</div></div><div class="attitude-values"><span>BANK <b id="flight-roll">0°</b></span><span>PITCH <b id="flight-pitch">0°</b></span></div><span class="instrument-label">WING<br>CONTROL</span></div><div class="power-status" id="power-status"><small>Gold = boost · Blue = shield</small></div></section>
     </footer><div class="performance" id="performance" hidden></div>
   </div>`;
 }
 
 export function updateFlightInstruments(local: PlayerSnapshot, course: CourseDefinition, elapsed: number, countdown: number, hazardSeconds = elapsed) {
   const text = (id: string, value: string) => { const el = document.getElementById(id); if (el) el.textContent = value; };
-  const roll = bodyRoll(local.heading, local.roll), f = frameAt(course, local.z);
-  text('flight-altitude', Math.max(0, local.y - course.floor).toFixed(1));
-  const climb = local.vy + Math.sin(local.pitch) * local.speed * .55 + f.forward[1] * local.speed;
-  text('flight-climb', `${climb >= 0 ? '+' : ''}${climb.toFixed(1)}`);
-  text('flight-roll', `${Math.round(wrapAngle(roll) * 180 / Math.PI)}°`);
-  text('flight-pitch', `${Math.round(local.pitch * 180 / Math.PI)}°`);
-  text('flight-heading', `${String(Math.round((f.yaw + local.heading) * 180 / Math.PI + 360) % 360).padStart(3, '0')}°`);
-  text('flight-condition', local.status === 'crashed' ? 'FEATHER RECOVERY' : Math.abs(wrapAngle(roll)) > .55 ? 'BANKED FLIGHT' : climb > 2 ? 'CLIMBING' : climb < -2 ? 'DESCENDING' : 'LEVEL FLIGHT');
-  text('style-score', local.styleScore.toLocaleString()); text('bonk-count', String(local.crashCount)); text('trick-count', String(local.trickCount)); text('streak-count', String(local.cleanStreak));
+  const roll = bodyRoll(local.heading, local.roll);
   text('distance-left', `${Math.max(0, Math.ceil(course.length - local.z))} m to finish`);
   text('race-phase', countdown > 0 ? `TAKEOFF IN ${Math.ceil(countdown)}` : local.status === 'finished' ? 'FLIGHT COMPLETE' : local.status === 'crashed' ? 'RETURNING TO CHECKPOINT' : `${Math.floor(elapsed)}s IN THE AIR`);
-  document.getElementById('attitude-bird')?.style.setProperty('transform', `rotate(${-roll}rad)`);
   const next = course.obstacles.find(o => isGate(o) && o.z > local.z - .5);
   const guidance = document.getElementById('gate-guidance');
   if (!next) { text('gate-name', 'THE FINISH LINE'); text('gate-instruction', 'Bring those wings home'); text('next-checkpoint', `${Math.max(0, Math.ceil(course.length - local.z))} m remaining`); guidance?.classList.remove('twist'); return; }

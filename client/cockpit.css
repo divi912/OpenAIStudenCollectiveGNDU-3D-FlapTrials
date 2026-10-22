@@ -30,6 +30,12 @@
 @media(prefers-reduced-motion:reduce){.comic-stamp{animation:none}.gate-reticle,#attitude-bird{transition:none}}
 body[data-reduced-motion=true] .comic-stamp{animation:none}body[data-reduced-motion=true] .gate-reticle,body[data-reduced-motion=true] #attitude-bird,body[data-reduced-motion=true] #course-progress{transition:none}
 .cockpit .gate-guidance{bottom:auto}.cockpit.party-active .gate-guidance{top:238px}
+.cockpit .cockpit-bottom{display:block;max-width:510px}
+.cockpit .cockpit-bottom>.flight-card{height:auto;min-height:116px}
+.cockpit .power-status{position:absolute;left:auto;right:var(--hud-edge);bottom:var(--hud-edge);justify-content:flex-end;margin:0;padding:0;border:0;min-height:0;transform:none}
+.cockpit .power-status>span{font-size:10px;padding:10px 14px;border:1px solid #ffffff80}
+.music-credit{font-size:10px;line-height:1.7;color:#829486;margin:-2px 0 18px}
+@media(max-width:1000px){.cockpit .power-status{bottom:160px}}
 @media(max-width:1100px){.cockpit .gate-guidance{top:132px}.cockpit.party-active .gate-guidance{top:228px}}
 @media(max-width:780px){.cockpit .gate-guidance{top:110px}.cockpit.party-active .gate-guidance{top:207px}}
 @media(max-height:700px) and (min-width:781px){.cockpit .gate-guidance{top:116px}.cockpit.party-active .gate-guidance{top:212px}}

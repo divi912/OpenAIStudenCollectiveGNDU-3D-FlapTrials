@@ -16,14 +16,13 @@ const noise = (n: number) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.545
 export function grandstand(place: Place, parent: TransformNode, side: number, z: number, theme = THEMES[0]) {
   const stand = new TransformNode('floating-grandstand', parent.getScene()); stand.parent = parent;
   stand.position.set(side * 24, -1, z); stand.rotation.y = -side * Math.PI / 2;
-  // One textured plane per row represents dozens of spectators; geometry is shared.
+  // Solid spectators are attached as one GPU batch by the audience renderer.
   place('island', '#647d82', stand, [0, -.8, -4], [43, 2.5, 9]);
   place('island', '#c5d4c9', stand, [0, .5, -4], [44, .4, 9]);
   for (let row = 0; row < 5; row++) {
     const y = row * 1.25 + 1, depth = -row * 2.1;
     place('box', ['#7ab6bb', '#e2bd8c', '#9cb9cf', '#d7a6ad', '#aebf9c'][row], stand, [0, y - .4, depth], [78 - row * 1.2, .6, 2.3]);
     place('box', theme.accent, stand, [0, y - .08, depth + 1.15], [78 - row * 1.2, .10, .10]);
-    place('crowd', '#ffffff', stand, [0, y + .55, depth + .55], [75 - row, 1.2, 1]);
   }
   place('banner', '#ffffff', stand, [0, -.1, 1.32], [77, 1.15, 1]);
   for (const x of [-37, 37]) {
@@ -39,6 +38,7 @@ export function grandstand(place: Place, parent: TransformNode, side: number, z:
     const thruster = place('hoop', '#8ce4ed', stand, [x, -2.5, -4], [2.3, 2.3, 1]); thruster.rotation.x = Math.PI / 2;
     place('leaf', '#8ce4ed', stand, [x, -3.1, -4], [2.8, .5, 2.8]);
   }
+  return stand;
 }
 
 export function garden(place: Place, parent: TransformNode, x: number, y: number, z: number, size: number, theme = THEMES[0], seed = 1) {
@@ -75,13 +75,14 @@ export function garden(place: Place, parent: TransformNode, x: number, y: number
   }
 }
 
-export function sceneryChunk(place: Place, parent: TransformNode, course: CourseDefinition, z: number, rotors: TransformNode[]) {
+export function sceneryChunk(place: Place, parent: TransformNode, course: CourseDefinition, z: number, rotors: TransformNode[], audience?: (stand: TransformNode) => void) {
   const theme = THEMES[course.difficultyIndex], index = z / 128;
   // Independent islands and gaps replace the continuous rectangular runway.
   if (z === 0) garden(place, parent, 0, -4.5, 6, 13, theme, 5);
   for (const side of [-1, 1]) {
     const x = side * (22 + noise(index + side) * 7), cz = z + 35 + side * 20;
-    grandstand(place, parent, side, z + 48, theme);
+    const stand = grandstand(place, parent, side, z + 48, theme);
+    audience?.(stand);
     if (index % 2 === 0) garden(place, parent, side * 48, -9, z + 108, 8, theme, index * 7 + side);
     // Waterfalls, white streaks and spray; all decorative and below the course floor.
     if ((index + side + 1) % 3 === 0) {

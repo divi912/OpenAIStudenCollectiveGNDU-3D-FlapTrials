@@ -30,6 +30,7 @@ import { apertureVertices, isGate, obstacleBoxes, obstaclePose } from '../../sha
 import type { Box, CourseDefinition, ObstacleDefinition, PlayerSnapshot, RacerState } from '../../shared/protocol';
 import type { Preferences } from '../storage';
 import { presentFrame } from './frame';
+import { Audience } from './audience';
 import { garden, sceneryChunk, THEMES } from './scenery';
 import { partyEvent } from '../../shared/party';
 import { frameAt, trackToWorld, bodyRoll } from '../../shared/track';
@@ -45,6 +46,7 @@ export class GameScene {
   renderer = 'WebGL2';
   engine: AbstractEngine;
   ready = false;
+  private audience?: Audience;
   private birdAsset?: AssetContainer;
   private birdLod?: AssetContainer;
   private kitAsset?: AssetContainer;
@@ -118,11 +120,15 @@ export class GameScene {
     this.resize();
   }
   private async load(): Promise<void> {
-    [this.birdAsset, this.kitAsset, this.birdLod] = await Promise.all([
+    const [bird, kit, lod, audience, audienceLod] = await Promise.all([
       LoadAssetContainerAsync('/models/bird.glb', this.scene),
       LoadAssetContainerAsync('/models/obstacle-kit.glb', this.scene),
       LoadAssetContainerAsync('/models/bird-lod.glb', this.scene),
+      LoadAssetContainerAsync('/models/audience.glb', this.scene),
+      LoadAssetContainerAsync('/models/audience-lod.glb', this.scene),
     ]);
+    this.birdAsset = bird; this.kitAsset = kit; this.birdLod = lod;
+    this.audience = new Audience(audience.meshes.find(m => m.getTotalVertices() > 0) as Mesh, audienceLod.meshes.find(m => m.getTotalVertices() > 0) as Mesh);
     this.buildMenu();
     this.sunMesh = this.instance('sun', '#fff1cc', this.menuRoot); this.sunMesh.parent = null; this.sunMesh.infiniteDistance = true; this.sunMesh.applyFog = false; this.sunMesh.setEnabled(false);
     this.sunMesh.scaling.set(24, 24, 24); this.sunMesh.position.set(-100, 90, 260);
@@ -152,7 +158,7 @@ export class GameScene {
     if (!mesh) {
       if (kind === 'cloud' || kind === 'leaf' || kind === 'bubble' || kind === 'sun') mesh = CreateSphere(key, { diameter: 1, segments: kind === 'bubble' ? 14 : kind === 'sun' ? 12 : kind === 'leaf' ? 4 : 6 }, this.scene);
       else if (kind === 'rock') mesh = CreateSphere(key, { diameter: 1, segments: 4 }, this.scene);
-      else if (kind === 'crowd' || kind === 'banner') mesh = CreatePlane(key, { size: 1 }, this.scene);
+      else if (kind === 'banner') mesh = CreatePlane(key, { size: 1 }, this.scene);
       else if (kind === 'gem') mesh = CreatePolyhedron(key, { type: 1, size: 1 }, this.scene);
       else if (kind === 'star') {
         mesh = new Mesh(key, this.scene); const data = new VertexData();
@@ -175,7 +181,7 @@ export class GameScene {
       }
       else mesh = CreateBox(key, { size: 1 }, this.scene);
       mesh.material = this.mat(color, ['pipe', 'gem', 'gear', 'hoop'].includes(kind)); mesh.isVisible = false; mesh.isPickable = false;
-      if (kind === 'crowd' || kind === 'banner') mesh.material = this.stadiumMaterial(kind);
+      if (kind === 'banner') mesh.material = this.stadiumMaterial(kind);
       if (kind === 'sun') { const sun = new StandardMaterial('sun-disc', this.scene); sun.disableLighting = true; sun.emissiveColor = c3('#ffe5a7'); mesh.material = sun; }
       if (kind === 'bubble') {
         const bubble = new StandardMaterial('shield-bubble', this.scene); bubble.diffuseColor = c3(color); bubble.emissiveColor = c3(color).scale(.35); bubble.alpha = .16; bubble.specularPower = 100; bubble.backFaceCulling = true; mesh.material = bubble;
@@ -185,30 +191,14 @@ export class GameScene {
     }
     return mesh;
   }
-  private stadiumMaterial(kind: 'crowd' | 'banner'): StandardMaterial {
-    const texture = new DynamicTexture(`${kind}-atlas`, { width: kind === 'crowd' ? 512 : 1024, height: kind === 'crowd' ? 64 : 128 }, this.scene, true);
-    const ctx = texture.getContext() as CanvasRenderingContext2D; ctx.clearRect(0, 0, 1024, 128);
-    if (kind === 'crowd') {
-      texture.hasAlpha = true; texture.uScale = 8; texture.wrapU = Texture.WRAP_ADDRESSMODE;
-      const colors = ['#ffd274', '#ee8b83', '#87ced5', '#bdafe3', '#d7e4b3', '#f3e9c6', '#85b39c', '#e7ac75'];
-      for (let i = 0; i < 16; i++) {
-        const x = i * 32 + 16, y = 40 + (i % 3) * 2;
-        ctx.fillStyle = '#29494c'; ctx.beginPath(); ctx.ellipse(x, y + 2, 13.5, 16, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = colors[i % colors.length]; ctx.beginPath(); ctx.ellipse(x, y, 12, 15, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.ellipse(x - 13, y - 6, 4, 9, -.7, 0, Math.PI * 2); ctx.ellipse(x + 13, y - 4, 4, 8, .7, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#fff9e8'; ctx.beginPath(); ctx.ellipse(x - 4, y - 4, 4, 5, 0, 0, Math.PI * 2); ctx.ellipse(x + 4, y - 4, 4, 5, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#284347'; ctx.beginPath(); ctx.arc(x - 3, y - 4, 1.7, 0, Math.PI * 2); ctx.arc(x + 5, y - 4, 1.7, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#e99c56'; ctx.beginPath(); ctx.moveTo(x - 4, y + 3); ctx.lineTo(x + 4, y + 3); ctx.lineTo(x, y + 8); ctx.fill();
-        if (i % 4 === 0) { ctx.fillStyle = '#e9ca8b'; ctx.fillRect(x - 13, 5, 2, 23); ctx.fillStyle = '#ed8379'; ctx.fillRect(x - 11, 5, 14, 9); }
-      }
-    } else {
-      ctx.fillStyle = '#244e50'; ctx.fillRect(0, 0, 1024, 128);
-      ctx.fillStyle = '#edc582'; ctx.fillRect(0, 0, 1024, 8); ctx.fillRect(0, 120, 1024, 8);
-      ctx.font = 'bold 39px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff3d5'; ctx.fillText('FLAP TRIALS   ✦   THE WING CUP   ✦   MAKE SOME NOISE', 512, 79);
-    }
+  private stadiumMaterial(kind: 'banner'): StandardMaterial {
+    const texture = new DynamicTexture(`${kind}-atlas`, { width: 1024, height: 128 }, this.scene, true);
+    const ctx = texture.getContext() as CanvasRenderingContext2D;
+    ctx.fillStyle = '#244e50'; ctx.fillRect(0, 0, 1024, 128);
+    ctx.fillStyle = '#edc582'; ctx.fillRect(0, 0, 1024, 8); ctx.fillRect(0, 120, 1024, 8);
+    ctx.font = 'bold 39px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff3d5'; ctx.fillText('FLAP TRIALS   ✦   THE WING CUP   ✦   MAKE SOME NOISE', 512, 79);
     texture.update(); const mat = new StandardMaterial(`${kind}-material`, this.scene);
     mat.diffuseTexture = texture; mat.specularColor = Color3.Black(); mat.emissiveTexture = texture; mat.emissiveColor = new Color3(.23, .23, .23); mat.backFaceCulling = false;
-    if (kind === 'crowd') { mat.transparencyMode = 1; mat.alphaCutOff = .4; }
     return mat;
   }
   private instance(kind: string, color: string, parent: TransformNode, position = [0, 0, 0], scale = [1, 1, 1]): InstancedMesh {
@@ -288,11 +278,12 @@ export class GameScene {
     this.camera.fov = 75 * Math.PI / 180; this.follow.set(0, 8, -7); this.look.set(0, 7, 20); this.resize();
   }
   private buildCourse(course: CourseDefinition): void {
+    this.audience?.clear();
     this.courseRoot?.dispose(false, false); this.obstacles = []; this.chunks = []; this.decorRotors = [];
     const root = this.courseRoot = new TransformNode(`course-${course.id}`, this.scene);
     for (let z = 0; z < course.length + 200; z += 128) {
       const chunk = new TransformNode(`chunk-${z}`, this.scene); chunk.parent = root; this.chunks.push({ root: chunk, z });
-      sceneryChunk(this.instance.bind(this), chunk, course, z, this.decorRotors);
+      sceneryChunk(this.instance.bind(this), chunk, course, z, this.decorRotors, stand => this.audience?.add(stand, z + 48));
       for (const side of [-1, 1]) {
         this.cloud(chunk, side * 39, 29 + (z % 7), z + 60, 8);
         this.cloud(chunk, side * 70, 44, z + 10, 6);
@@ -392,6 +383,7 @@ export class GameScene {
         temp.set(...trackToWorld(this.course!, local.x * .6, cameraY + .45, local.z + 22));
         Vector3.LerpToRef(this.look, temp, snap ? 1 : 1 - Math.exp(-dt * 9), this.look);
         this.camera.position.copyFrom(this.follow); this.camera.setTarget(this.look);
+        this.audience?.update(local.z, this.settings.quality === 'low' || (this.settings.quality === 'auto' && this.resolution > 1.15));
         for (const chunk of this.chunks) chunk.root.setEnabled(chunk.z > local.z - 200 && chunk.z < local.z + 330);
         const boosted = local.simulationTick < local.boostUntilTick || local.speed > 23;
         const targetFov = (boosted && !this.settings.reducedMotion ? 81 : 75) * Math.PI / 180;
@@ -448,5 +440,5 @@ export class GameScene {
     const x = point.x / width * 100, y = point.y / height * 100;
     if (point.z > 0 && point.z < 1 && x > 24 && x < 76 && y > 25 && y < 70) return { x, y };
   }
-  get stats() { return { mode: this.mode, courseId: this.course?.id, fps: Math.round(this.engine.getFps()), meshes: this.scene.getActiveMeshes().length, drawCalls: this.instrumentation.drawCallsCounter.current, triangles: this.scene.getActiveIndices() / 3, vertices: this.scene.getTotalVertices(), renderer: this.renderer, width: this.engine.getRenderWidth(), height: this.engine.getRenderHeight() }; }
+  get stats() { return { audience: this.audience?.stats, mode: this.mode, courseId: this.course?.id, fps: Math.round(this.engine.getFps()), meshes: this.scene.getActiveMeshes().length, drawCalls: this.instrumentation.drawCallsCounter.current, triangles: this.scene.getActiveIndices() / 3, vertices: this.scene.getTotalVertices(), renderer: this.renderer, width: this.engine.getRenderWidth(), height: this.engine.getRenderHeight() }; }
 }

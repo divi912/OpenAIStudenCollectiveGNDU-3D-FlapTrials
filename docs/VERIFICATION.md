@@ -1,5 +1,12 @@
 # Local verification — 2026-10-22
 
+## Minimal HUD, solid audience and soundtrack
+
+- **54 unit/integration tests and 9 browser tests** pass. Browser checks cover the simplified HUD, working flight/rooms, actual GPU-instanced birds, lower crowd cost on Low quality, repeated practice restarts, independent persisted music mute, browser audio unlock and the rendered music waveform. A focused layout check verifies that two active power badges clear the progress card at 1440, 1280 and 780px widths.
+- The new Blender models have **278 triangles / 8,764 bytes** near and **94 triangles / 4,136 bytes** far, each one vertex-colored primitive with no textures, skeletons or animation. Combined gzip size is approximately **5.5 KB** using the existing production HTTP compression. Static thin-instance buffers render a stand in one draw without per-bird JS objects. Nearby stands use 104 birds; distant/Low quality uses 52, with frustum/chunk/distance culling. Quality switching and LOD hysteresis are handled explicitly.
+- **Wing Cup Weekend** is an original 132 BPM, 16-bar instrumental rendered once through OfflineAudioContext, then looped by one source. It adds no music-file transfer or per-frame note scheduling. The stereo 22,050 Hz buffer lasts 29.09s and uses about 5.13 MB. Browser waveform verification checks headroom, nonzero signal and loop continuity; a short percussion attack fixes a measured hi-hat discontinuity at the boundary. Music and effects have separate saved levels; hidden tabs suspend audio.
+- Review caught inherited positioning that could overlap power badges with the new footer, and an Adaptive-to-High switch retaining low audience detail. Both were corrected. The existing real-GPU/WebGPU and human-listening performance/feel limits still apply: a software-rendered browser cannot certify lag-free hardware performance or subjective musical taste.
+
 ## 3D flight and cockpit refinement
 
 - **52 unit/integration tests and 7 browser tests** pass, along with type checking, production build and asset validation. New coverage includes heading/pitch motion, real roll-dependent slot clearance, angular reset/replay, full-roll scoring without partial-bank farming, path/frame orthonormality, and exact agreement between Babylon quaternion orientation and shared wing probes.
