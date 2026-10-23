@@ -34,7 +34,7 @@ export function updateFlightInstruments(local: PlayerSnapshot, course: CourseDef
   text('gate-name', next.kind === 'twist_gate' ? 'TWIST SLOT · BANK TO FIT' : `${next.shape ?? 'rectangle'} ${next.kind === 'shutter' ? 'SHUTTER' : next.kind === 'rotating_gate' ? 'SPINNER' : 'GATE'}`.toUpperCase());
   if (next.kind === 'twist_gate') {
     const difference = .5 * Math.atan2(Math.sin(2 * (pose.angle + Math.PI / 2 - roll)), Math.cos(2 * (pose.angle + Math.PI / 2 - roll)));
-    text('gate-instruction', Math.abs(difference) < .2 ? 'Good bank. Hold your line!' : `Q / E · ${difference > 0 ? 'roll left' : 'roll right'}`);
+    text('gate-instruction', Math.abs(difference) < .2 ? 'Good bank. Hold your line!' : `${document.body.dataset.touch === 'true' ? 'ROLL' : 'Q / E'} · ${difference > 0 ? 'roll left' : 'roll right'}`);
   } else text('gate-instruction', `${Math.abs(pose.x - local.x) > 1.3 ? (pose.x > local.x ? 'Turn right' : 'Turn left') : 'Line up'}${Math.abs(pose.y - local.y) > 1.4 ? (pose.y > local.y ? ' & flap up' : ' & drop down') : ' & thread the gap'}`);
   text('next-checkpoint', `${Math.ceil(distance)} m ahead · ${(distance / Math.max(1, local.speed)).toFixed(1)}s approach`);
   guidance?.classList.toggle('twist', next.kind === 'twist_gate');

@@ -130,3 +130,7 @@ The public frontend is deployed on Cloudflare; no public multiplayer backend has
 
 Babylon.js: Apache-2.0. Colyseus: MIT. Fredoka and Manrope fonts: SIL Open Font License; license files are included with the fonts. WebGPU shader compiler files are copied from the installed Babylon package by `postinstall`.
 
+
+## Phone controls
+
+Touch devices have on-screen turn/pitch, flap, dive and roll controls. Portrait and landscape layouts adapt to the screen. See [phone controls](docs/MOBILE-CONTROLS.md).

@@ -3,7 +3,16 @@ import type { InputFrame } from '../../shared/protocol';
 export class Controls {
   private keys = new Set<string>();
   private flaps = 0;
-  enabled = false;
+  private touches = new Map<number, string>();
+  private active = false;
+  onEnabledChange = (_enabled: boolean) => {};
+  get enabled() { return this.active; }
+  set enabled(value: boolean) {
+    if (value === this.active) return;
+    this.active = value;
+    if (!value) this.clear();
+    this.onEnabledChange(value);
+  }
   onFlap = () => {};
   onRestart = () => {};
   onMenu = () => {};
@@ -21,13 +30,24 @@ export class Controls {
     window.addEventListener('blur', () => this.clear());
     document.addEventListener('visibilitychange', () => this.clear());
   }
-  clear() { this.keys.clear(); this.flaps = 0; }
+  touchStart(pointerId: number, key: string) {
+    if (!this.enabled || this.touches.has(pointerId)) return;
+    this.touches.set(pointerId, key);
+    if (key === 'Space') { this.flaps = Math.min(2, this.flaps + 1); this.onFlap(); }
+  }
+  touchEnd(pointerId: number) { this.touches.delete(pointerId); }
+  clear() { this.keys.clear(); this.touches.clear(); this.flaps = 0; }
   read(sequence: number, tick: number): InputFrame {
-    const steer = Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) - Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft'));
+    const held = (key: string) => {
+      if (this.keys.has(key)) return true;
+      for (const touch of this.touches.values()) if (touch === key) return true;
+      return false;
+    };
+    const steer = Number(held('KeyD') || held('ArrowRight')) - Number(held('KeyA') || held('ArrowLeft'));
     const flapPressed = this.enabled && this.flaps > 0;
     if (flapPressed) this.flaps--;
-    return { sequence, tick, steer: this.enabled ? steer as -1 | 0 | 1 : 0, flapPressed, diveHeld: this.enabled && (this.keys.has('ShiftLeft') || this.keys.has('ShiftRight')),
-      pitch: this.enabled ? (Number(this.keys.has('KeyW') || this.keys.has('ArrowUp')) - Number(this.keys.has('KeyS') || this.keys.has('ArrowDown'))) as -1 | 0 | 1 : 0,
-      roll: this.enabled ? (Number(this.keys.has('KeyQ')) - Number(this.keys.has('KeyE'))) as -1 | 0 | 1 : 0 };
+    return { sequence, tick, steer: this.enabled ? steer as -1 | 0 | 1 : 0, flapPressed, diveHeld: this.enabled && (held('ShiftLeft') || held('ShiftRight')),
+      pitch: this.enabled ? (Number(held('KeyW') || held('ArrowUp')) - Number(held('KeyS') || held('ArrowDown'))) as -1 | 0 | 1 : 0,
+      roll: this.enabled ? (Number(held('KeyQ')) - Number(held('KeyE'))) as -1 | 0 | 1 : 0 };
   }
 }

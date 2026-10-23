@@ -16,16 +16,25 @@ npm run deploy:cloudflare
 ```
 
 For a Git-connected Workers Build, select this repository and the
-`codex/model-polish` branch, set build command `npm run build`, and deploy
+`codex/model-polish` branch, set build command `npm run build:cloudflare`, and deploy
 command `npx wrangler@4.152.0 deploy --keep-vars`. The checked-in config supplies
 the Worker name, assets directory and custom domain. A local Wrangler deploy
 does not itself enable Git-triggered builds.
 
-The public site supports solo practice. Workers Static Assets does not run the
-existing Node/Colyseus multiplayer server. Use the LAN instructions below to
-play together locally.
+The public frontend connects to the Node/Colyseus backend at
+`https://openaistudencollectivegndu-3d-flaptrials.onrender.com`, configured in
+`.env.cloudflare`. This file is public configuration, not a credential.
+On Render set `CLIENT_ORIGIN=https://flaptrials.divii.xyz` exactly (no trailing
+slash or period), and use `/health` as the service health-check path.
+Render's free service can take about a minute to wake up after inactivity;
+room creation may need to be retried after it wakes. Server restarts discard
+active rooms.
 
-## Current play mode: one player hosts on their PC
+Workers Static Assets serves only the frontend; Render runs multiplayer.
+Ordinary `npm run build` and `npm run lan` do not use `.env.cloudflare` and
+continue connecting to the local server. LAN play remains available below.
+
+## Optional LAN play: one player hosts on their PC
 
 For now, the player who creates a race runs the authoritative Colyseus server on their own computer. Everyone must be connected to the same local network (Wi-Fi/LAN). The host runs the game and server together; other players open the host PC's LAN URL in their browser and join from there.
 
@@ -47,8 +56,8 @@ The existing Pages project remains available at `flap-trials.pages.dev`, using b
 
 A Pages-hosted browser cannot start a Node server on the player's computer. For LAN multiplayer, all participants need the host's LAN URL above, which serves both client and server from the host PC. They should not use the public Pages URL to join the LAN room. Cloudflare can host the landing page/game download, while authoritative multiplayer continues to run on the room creator's computer. A future direct Pages-to-LAN connection would need a secure runtime configuration and HTTPS/WSS compatibility on the local host; this setup intentionally avoids that complication.
 
-## If public multiplayer is added later
+## Public multiplayer backend
 
-A persistent Node/Colyseus backend is still required for players outside the host's network. Cloudflare Pages hosts only the client bundle. The current build-time `VITE_SERVER_URL` can point a Pages client at a public HTTPS/WSS backend, but it is not used for the LAN instructions above. The included Dockerfile can run the server on a persistent Node host. Begin with one process because room lookup and room limits are stored in memory. Test WebSocket upgrades, reconnect behavior, TLS and matching client/server versions before release.
+A persistent Node/Colyseus backend is required for players outside the host's network. The included Dockerfile runs it on Render. Deploy matching client/server versions from the same branch. Keep one server instance because room lookup and room limits are stored in memory. The Cloudflare frontend uses the build-time `VITE_SERVER_URL`; a normal local build does not use the hosted backend.
 
 Cloudflare documentation: [Pages build configuration](https://developers.cloudflare.com/pages/configuration/build-configuration/), [Pages custom domains](https://developers.cloudflare.com/pages/configuration/custom-domains/), [WebSockets](https://developers.cloudflare.com/network/websockets/).

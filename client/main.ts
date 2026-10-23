@@ -2,6 +2,8 @@ import './styles.css';
 import './cockpit.css';
 import './intro.css';
 import './nametags.css';
+import './mobile.css';
+import { mountTouchControls, touchDevice } from './game/touch-controls';
 import { NameTags } from './game/nametags';
 import { GameScene } from './game/scene';
 import { Controls } from './game/input';
@@ -23,6 +25,7 @@ app.insertAdjacentHTML('beforeend', '<div id="bird-names" aria-hidden="true"></d
 const nameContainer = document.querySelector<HTMLDivElement>('#bird-names')!;
 const nameTags = new NameTags(nameContainer);
 const p = preferences(), controls = new Controls(), audio = new GameAudio(), connection = new Connection();
+mountTouchControls(controls, app);
 audio.volume = p.volume;
 audio.musicVolume = p.musicVolume;
 document.body.dataset.reducedMotion = String(p.reducedMotion);
@@ -106,7 +109,7 @@ connection.changed = () => {
 };
 controls.onFlap = () => audio.flap();
 controls.onRestart = () => { if (practice && !modalKind) startPractice(); };
-controls.onMenu = () => { audio.unlock(); if (modalKind === 'settings' || modalKind === 'help') closeModal(); else if (!modalKind || modalKind === 'lobby') setModal(settingsModal(p, scene?.renderer ?? 'Loading', view === 'race'), 'settings'); };
+controls.onMenu = () => { audio.unlock(); if (modalKind === 'settings' || modalKind === 'help') closeModal(); else if (!modalKind || modalKind === 'lobby') setModal(settingsModal(p, scene?.renderer ?? 'Loading', view === 'race', !!practice), 'settings'); };
 
 document.addEventListener('click', async event => {
   const target = (event.target as HTMLElement).closest<HTMLElement>('[data-action]');
@@ -115,7 +118,7 @@ document.addEventListener('click', async event => {
   switch (action) {
     case 'home': if (!connection.room && view === 'home') closeModal(); break;
     case 'help': setModal(helpModal(), 'help'); break;
-    case 'settings': setModal(settingsModal(p, scene?.renderer ?? 'Loading', view === 'race'), 'settings'); break;
+    case 'settings': setModal(settingsModal(p, scene?.renderer ?? 'Loading', view === 'race', !!practice), 'settings'); break;
     case 'close': if (modalKind === 'lobby' || modalKind === 'results') await leave(); else if (connection.room?.state.phase === 'lobby') { lobbySignature = ''; modalKind = ''; connection.changed(); } else closeModal(); break;
     case 'practice': startPractice(); break;
     case 'course': selected = target.dataset.course!; document.querySelector('#course-grid')!.innerHTML = courseCards(selected); break;
@@ -204,14 +207,14 @@ function updateHud(now: number, players: PlayerSnapshot[], localId: string, elap
   if (local.crashCount > previousCrashCount) {
     previousCrashCount = local.crashCount; audio.crash(); scene?.crash(local);
     const joke = local.crashCause === 'missed_gate' ? 'NOT A DOOR!' : ['BONK!', 'EGGSCUSE ME!', 'FEATHER BENDER!'][local.crashCount % 3];
-    cue(`<div class="comic-stamp"><b>${joke}</b><small>${local.crashCause === 'missed_gate' ? 'The opening was over there. Try the Q / E roll!' : local.crashCause === 'bounds' ? 'The audience paid to watch you fly inside the arena.' : 'A brief disagreement with architecture. Back to your checkpoint.'}</small></div>`, 900);
+    cue(`<div class="comic-stamp"><b>${joke}</b><small>${local.crashCause === 'missed_gate' ? 'The opening was over there. Bank your wings to fit!' : local.crashCause === 'bounds' ? 'The audience paid to watch you fly inside the arena.' : 'A brief disagreement with architecture. Back to your checkpoint.'}</small></div>`, 900);
   }
   if (local.trickCount > previousTricks) { previousTricks = local.trickCount; audio.tone(900, .2); scene?.crash(local); cue('<div class="comic-stamp roll"><b>ROTISSERIE MODE!</b><small>One complete barrel roll. +200 style. Zero dignity lost.</small></div>', 1400); }
   if (local.gatesCleared > previousGates) { previousGates = local.gatesCleared; if (local.cleanStreak >= 3 && local.cleanStreak % 3 === 0 && now > cueUntil) cue(`<div class="comic-stamp positive"><b>${local.cleanStreak >= 6 ? 'UNFLAPPABLE!' : 'FLAPULOUS!'}</b><small>${local.cleanStreak} clean gates in a row. The crowd is losing its feathers.</small></div>`, 1100); }
   if (local.checkpointIndex > previousCheckpoint) { previousCheckpoint = local.checkpointIndex; audio.checkpoint(); if (now > cueUntil) cue('<strong class="checkpoint-cue">Checkpoint!</strong><span>A little closer to the finish.</span>', 950); }
   if (countdown > 0) {
     const count = Math.ceil(countdown);
-    cue(`<span class="countdown-label">WINGS AT THE READY</span><strong class="countdown-number">${count}</strong><span>SPACE flap · A / D turn · W / S pitch · Q / E roll</span>`);
+    cue(`<span class="countdown-label">WINGS AT THE READY</span><strong class="countdown-number">${count}</strong><span>${touchDevice ? 'Tap FLAP · Left pad to turn and pitch · Hold ROLL to bank' : 'SPACE flap · A / D turn · W / S pitch · Q / E roll'}</span>`);
     if (count !== previousCountdown) { previousCountdown = count; audio.tone(440, .1); }
   } else if (previousCountdown > 0) { previousCountdown = 0; audio.tone(880, .3); cue('<strong class="countdown-number go">FLY!</strong>', 700); }
   else if (now > cueUntil && local.status !== 'finished') cue('');

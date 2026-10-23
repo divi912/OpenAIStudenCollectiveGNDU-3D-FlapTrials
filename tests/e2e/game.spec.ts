@@ -21,7 +21,8 @@ test('practice flies, a held key does not auto-flap, crashes respawn, and restar
   await page.goto('/?webgl=1&debug=1');
   await expect(page.locator('body')).toHaveAttribute('data-renderer', 'WebGL2', { timeout: 45000 });
   await page.getByRole('button', { name: 'Solo practice' }).click();
-  await expect(page.locator('#hud')).toBeVisible();
+  // The pre-race cinematic intentionally hides the HUD for six seconds.
+  await expect(page.locator('#hud')).toBeVisible({ timeout: 15000 });
   await page.waitForFunction(() => (window as any).__flap.practice?.z > 1, { timeout: 10000 });
   await page.keyboard.down('Space');
   await page.waitForTimeout(1100);
