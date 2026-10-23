@@ -1,9 +1,13 @@
 import './styles.css';
 import './cockpit.css';
+import './intro.css';
+import './nametags.css';
+import { NameTags } from './game/nametags';
 import { GameScene } from './game/scene';
 import { Controls } from './game/input';
 import { GameAudio } from './game/audio';
 import { partyEvent } from '../shared/party';
+import { INTRO_SECONDS, COUNTDOWN_SECONDS, PRE_RACE_SECONDS } from '../shared/intro';
 import { hudTemplate, updateFlightInstruments } from './cockpit';
 import { Connection, SERVER_URL } from './network/connection';
 import { COURSES, getCourse } from '../shared/courses';
@@ -13,8 +17,11 @@ import { preferences, savePreferences, personalBest } from './storage';
 import { homeTemplate, courseCards, profileModal, helpModal, settingsModal, lobbyModal, resultsModal, formatTime, icon, escapeHtml } from './ui';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
-app.innerHTML = '<canvas id="world" class="world-canvas" aria-label="Flap Trials 3D world"></canvas><div id="home"></div><div id="hud" hidden></div><div id="modal"></div><div id="toast" role="status" aria-live="polite"></div><div id="boot-note">Warming up the wings…</div>';
+app.innerHTML = '<canvas id="world" class="world-canvas" aria-label="Flap Trials 3D world"></canvas><div id="home"></div><div id="hud" hidden></div><div id="race-intro" hidden><div class="intro-title"><span id="intro-label"></span><h1 id="intro-course"></h1><p id="intro-detail"></p></div><div id="intro-roster"></div><div class="intro-timeline"><i></i></div></div><div id="modal"></div><div id="toast" role="status" aria-live="polite"></div><div id="boot-note">Warming up the wings…</div>';
 const home = document.querySelector<HTMLDivElement>('#home')!, hud = document.querySelector<HTMLDivElement>('#hud')!, modal = document.querySelector<HTMLDivElement>('#modal')!, toastElement = document.querySelector<HTMLDivElement>('#toast')!;
+app.insertAdjacentHTML('beforeend', '<div id="bird-names" aria-hidden="true"></div>');
+const nameContainer = document.querySelector<HTMLDivElement>('#bird-names')!;
+const nameTags = new NameTags(nameContainer);
 const p = preferences(), controls = new Controls(), audio = new GameAudio(), connection = new Connection();
 audio.volume = p.volume;
 audio.musicVolume = p.musicVolume;
@@ -54,8 +61,8 @@ function startPractice() {
   if (!scene?.ready) { toast('The sky is almost ready. Give it a moment.'); return; }
   audio.unlock(); savePreferences(p); resetFeedback(); practiceTick = 0; accumulator = 0;
   practice = { ...createRacer('practice'), name: p.name, color: p.color, ready: true, loaded: true, connected: true };
-  practiceStartTime = performance.now() + 3000;
-  openRace(selected, true); closeModal(); controls.enabled = true;
+  practiceStartTime = performance.now() + PRE_RACE_SECONDS * 1000;
+  openRace(selected, true); closeModal(); controls.enabled = false;
 }
 function openRace(courseId: string, isPractice: boolean) {
   view = 'race'; document.body.dataset.view = 'race'; home.hidden = true; hud.hidden = false;
@@ -92,7 +99,7 @@ connection.changed = () => {
   } else if (s.phase === 'countdown' || s.phase === 'racing') {
     if (view !== 'race' || raceCourse !== s.courseId) openRace(s.courseId, false);
     if (modalKind === 'lobby' || modalKind === 'loading') closeModal();
-    controls.enabled = !modalKind;
+    controls.enabled = !modalKind && s.phase === 'racing';
   } else if (s.phase === 'results') {
     showResults([...s.players.values()].map(v => v.toJSON() as PlayerSnapshot), room.sessionId, s.courseId, s.startTick, false);
   }
@@ -233,7 +240,25 @@ function frame(now: number) {
     raceSeconds = Math.max(0, ((connection.local?.simulationTick ?? serverTick) - s.startTick) / 60);
   }
   if (view === 'race' && now - lastHud > 80) { lastHud = now; updateHud(now, players, localId, elapsed, countdown, raceSeconds); }
-  scene?.render(now, dt, players, localId, raceSeconds);
+  const introElapsed = view === 'race' && countdown > COUNTDOWN_SECONDS
+    ? Math.max(0, PRE_RACE_SECONDS - countdown) : undefined;
+  const intro = document.querySelector<HTMLDivElement>('#race-intro')!;
+  intro.hidden = introElapsed === undefined;
+  document.body.dataset.intro = String(introElapsed !== undefined);
+  if (introElapsed !== undefined) {
+    const lineup = introElapsed >= 4;
+    document.querySelector('#intro-label')!.textContent = lineup ? 'MEET THE FLOCK' : 'YOUR NEXT CHALLENGE';
+    document.querySelector('#intro-course')!.textContent = getCourse(raceCourse).definition.name;
+    document.querySelector('#intro-detail')!.textContent = lineup ? 'Tiny wings. Big ambitions. Get ready to fly!' : 'Clear every gate. Chase the golden flags. Own the finish.';
+    const roster = document.querySelector<HTMLDivElement>('#intro-roster')!;
+    const names = lineup ? players.map(v => `<span style="--bird-color:${v.color}">${escapeHtml(v.name)}${v.playerId === localId ? '<small>YOU</small>' : ''}</span>`).join('') : '';
+    if (roster.innerHTML !== names) roster.innerHTML = names;
+    intro.style.setProperty('--intro-progress', String(introElapsed / INTRO_SECONDS));
+  }
+  if (practice && view === 'race') { controls.enabled = !modalKind && countdown === 0; if (countdown > 0) controls.clear(); }
+  scene?.render(now, dt, players, localId, raceSeconds, introElapsed);
+  nameContainer.hidden = view !== 'race' || !!modalKind;
+  nameTags.update(view === 'race' ? players : [], id => scene?.birdMarker(id), localId);
   requestAnimationFrame(frame);
 }
 
@@ -253,4 +278,4 @@ GameScene.create(document.querySelector<HTMLCanvasElement>('#world')!, p).then(r
 setInterval(() => void updateServerStatus(), 30000);
 
 // Read-only diagnostics for browser automation and local profiling; never an authority channel.
-Object.defineProperty(window, '__flap', { get: () => ({ audio: audio.stats, view, courseId: raceCourse || selected, renderer: scene?.renderer, stats: scene?.stats, practice: practice ? { ...practice } : undefined, room: connection.room?.state.toJSON(), sessionId: connection.room?.sessionId }) });
+Object.defineProperty(window, '__flap', { get: () => ({ audio: audio.stats, view, courseId: raceCourse || selected, renderer: scene?.renderer, stats: scene?.stats, camera: scene?.cameraMotion, practice: practice ? { ...practice } : undefined, room: connection.room?.state.toJSON(), sessionId: connection.room?.sessionId }) });

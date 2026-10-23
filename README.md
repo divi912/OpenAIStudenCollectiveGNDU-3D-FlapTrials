@@ -2,21 +2,11 @@
 
 Tiny wings. Big trials. A keyboard-controlled multiplayer party flight racer in a floating bird stadium.
 
-## Current checkpoint: visual/modeling upgrade paused
+## Model polish � 2026-10-23
 
-Development paused on **2026-10-23** at the user's request. The latest visual pass is **work in progress**, saved so it can be completed later. The previous completed gameplay/HUD/music checkpoint is commit `c494f16`.
+The modeling pass now includes brass goggle fasteners, temple straps, nostrils and a leather harness backplate, plus branched trees, layered waterfall spray and detailed balloon baskets. Corrected sphere, ring and bevelled gate winding removes inside-out surfaces; gate seam normals are normalized.
 
-The current pass adds:
-
-- A more detailed local bird with layered back/wing feathers, feather shafts, harness stitching and an aviator badge. The local racer now uses the full model; remote racers use a smaller model.
-- Smoother 3D audience birds with eye highlights and layered wing feathers, still rendered in GPU batches with distance detail levels.
-- Continuous bevelled obstacle frames, enamel surface detail, metal trim and fittings. Frame openings are derived from the shared collision apertures.
-- Rounded seating, seat backs, brass rails, roof ribs, lanterns and structural braces; richer rocky islands, trees, foliage and smoother clouds.
-- Shared procedural enamel, stone and foliage color/normal maps, plus custom sphere/ring geometry to control mesh cost. Adaptive quality can lower audience density while keeping nearby models detailed.
-
-**Resume here:** [Modeling upgrade handoff](docs/MODELING-UPGRADE.md). It records the asset pipeline, current model budgets, changed files and remaining checks. Do not treat this checkpoint as a finished visual release.
-
-At pause: **55 unit/integration tests pass**. The latest browser run has **one failing Reduced Motion assertion** (expected `animationName: none`, received an empty string); the other eight browser tests completed without recorded failures. The new pass still needs final geometry/lighting review, hardware performance tuning, production-build verification and updated final screenshots.
+Current bird budgets are **53,416 triangles** close-up and **12,812 triangles** for rivals. Gate clearance, animated wing pivots, gameplay and the simplified HUD remain intact. See [verification](docs/VERIFICATION.md) for measured results and remaining full-course/WebGPU validation.
 
 ## Run locally
 
@@ -27,9 +17,13 @@ npm ci
 npm run dev
 ```
 
-Open **http://localhost:5173**. Vite serves the client on port 5173 and the authoritative Colyseus server runs on port 2567. Both bind to the local network, so a friend on the same LAN can open your machine's IP address on port 5173. Allow these ports through the host firewall if needed.
+Open **http://localhost:5173** for development. For a hosted LAN game, run `npm run lan` on the room creator's PC and share the printed `http://<host-LAN-IP>:2567` URL with players on the same Wi-Fi/LAN. Keep its terminal open and allow Node through Windows Firewall on private networks if prompted. This serves the game and its authoritative server from one PC; it does not support internet-wide room joins. See [Cloudflare and LAN hosting](docs/deployment/CLOUDFLARE-PAGES.md).
 
 Choose **Solo practice** for an immediate offline race. To race together, use **Create a room**, share its six-character code, join from another browser, ready up, and let the host start. **Let's race** joins the public queue, which starts a 15-second preparation timer once two players are ready.
+
+Every race opens with a six-second cinematic: a course flyover followed by an animated starting lineup, then the three-second countdown. Multiplayer uses the server's shared start tick; the intro never consumes race time. Reduced Motion uses static course/lineup shots. Hosting remains local; no cloud service is required.
+
+Racers have screen-facing overhead name tags showing their chosen names. The chase camera follows heading and pitch, smoothly leans into A/D turns and banks gently with Q/E rolls without spinning the horizon through a full barrel roll. Reduced Motion disables these extra camera movements.
 
 | Key | Action |
 | --- | --- |
@@ -58,9 +52,9 @@ Starting 12 seconds into the race, a three-second warning announces a shared eve
 
 **Babylon.js 9.32** initializes **WebGPU first** when the browser exposes a supported adapter, falling back to WebGL2. WebGPU requires a secure context (HTTPS or localhost) and supporting browser/driver. `?webgl=1` explicitly selects WebGL2 for comparison. Shader compiler assets, fonts and models are served locally; no runtime Babylon CDN connection is needed.
 
-The renderer uses shared geometry, instancing, course-section visibility, pooled effects, simple lighting, and adaptive resolution. Graphics settings never change simulation speed. The simulation runs at 60 Hz; the server publishes state at 20 Hz. The close-up Blender bird has **18,616 triangles**, while racing birds and smaller menu birds use a **5,954-triangle LOD**. Both retain five meshes and animated wings. The obstacle kit is 976 triangles.
+The renderer uses shared geometry, instancing, course-section visibility, pooled effects, simple lighting, and adaptive resolution. Graphics settings never change simulation speed. The simulation runs at 60 Hz; the server publishes state at 20 Hz. The close-up Blender bird has **53,416 triangles**, while racing birds and smaller menu birds use a **12,812-triangle LOD**. Both retain five meshes and animated wings. The obstacle kit is 1,612 triangles.
 
-Floating grandstands replace the cone mountains and flat runway. Five-tier seating, canopies, banners, thrusters, clouds, garden islands, waterfalls and balloons frame the course. Spectators are solid Blender bird models with beaks, eyes, folded wings, tails and crests. GPU thin instances batch each stand into one draw, with static buffers, vertex colors, no textures/rigs/shadows and no per-bird JavaScript objects. Near birds use 278 triangles; distant birds use 94. Distance LOD, culling, lower crowd density and adaptive quality keep the cost bounded. Both models together total about 13 KB raw, with existing production HTTP compression reducing transfer further. Each course has its own palette. Gate visuals and swept collision share the same polygon boundary and moving pose.
+Floating grandstands replace the cone mountains and flat runway. Five-tier seating, canopies, banners, thrusters, clouds, garden islands, waterfalls and balloons frame the course. Spectators are solid Blender bird models with beaks, eyes, folded wings, tails and crests. GPU thin instances batch each stand into one draw, with static buffers, vertex colors, no textures/rigs/shadows and no per-bird JavaScript objects. Near birds use 2,006 triangles; distant birds use 322. Distance LOD, culling, lower crowd density and adaptive quality keep the cost bounded. Both models together total about 59 KB raw, with existing production HTTP compression reducing transfer further. Each course has its own palette. Gate visuals and swept collision share the same polygon boundary and moving pose.
 
 Editable assets are in `assets/source`, including `audience.blend` and `audience-lod.blend`. Runtime GLBs are in `public/models`. Blender is **not required to run or build the game**; generated GLBs are included.
 
@@ -111,6 +105,10 @@ Load tests submit real legal input frames; they do not teleport racers or bypass
 
 Local browser and load tests are engineering checks, not a guarantee of 60 FPS on every integrated GPU or a production capacity claim. See `docs/VERIFICATION.md` for measured results and remaining hardware/network validation.
 
+## Cloudflare deployment
+
+See [Cloudflare Pages deployment preparation](docs/deployment/CLOUDFLARE-PAGES.md) for the Pages build settings, `flaptrials.divii.xyz` domain setup, and persistent multiplayer server requirements.
+
 ## Production
 
 ```sh
@@ -120,7 +118,7 @@ npm start
 
 The Node server serves the production client at **http://localhost:2567**. Build output is separated into `dist/client` and `dist/server`.
 
-For separate hosting, set **`VITE_SERVER_URL` before building** to the HTTPS address of the persistent multiplayer server. Cloudflare Pages can deploy `dist/client` using `npm ci && npm run build`. Use a persistent Node service or Colyseus Cloud for the backend; static hosting alone cannot host authoritative rooms. A Dockerfile and PM2 configuration are included. `PORT` defaults to 2567, `CLIENT_ORIGIN` defaults to `*` (set to the client origin for production), and `MAX_ROOMS` defaults to 10.
+Cloudflare Pages can deploy `dist/client` using `npm ci && npm run build`. For now, multiplayer rooms are hosted by the room creator running `npm run lan` on their PC; everyone on the same LAN joins through that PC�s printed URL. Public internet multiplayer would require a separate persistent backend. See [Cloudflare and LAN hosting](docs/deployment/CLOUDFLARE-PAGES.md). A Dockerfile and PM2 configuration are included. `PORT` defaults to 2567, `CLIENT_ORIGIN` defaults to `*` (set to the client origin for production), and `MAX_ROOMS` defaults to 10.
 
 Use one process initially. Room-code lookup and room limits are process-local; multiple processes require shared room discovery/presence and admission control before scaling. Existing races are ephemeral and are lost on server restart. Drain active rooms before deploying; deploy matching client/server versions together. Keep the previous compatible deployment available for rollback. No account system, database, Redis service or paid model-generation API is needed for the single-process beta.
 
@@ -129,3 +127,4 @@ No cloud account or public deployment has been created by the local implementati
 ## Third-party licenses
 
 Babylon.js: Apache-2.0. Colyseus: MIT. Fredoka and Manrope fonts: SIL Open Font License; license files are included with the fonts. WebGPU shader compiler files are copied from the installed Babylon package by `postinstall`.
+

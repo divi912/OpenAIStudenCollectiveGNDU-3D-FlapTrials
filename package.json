@@ -20,7 +20,8 @@
     "test:e2e": "playwright test",
     "assets:build": "node scripts/build-assets.mjs",
     "assets:check": "node scripts/check-assets.mjs",
-    "loadtest": "tsx scripts/loadtest.ts"
+    "loadtest": "tsx scripts/loadtest.ts",
+    "lan": "npm run build && node scripts/lan-server.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "^9.32.0",

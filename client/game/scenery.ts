@@ -76,6 +76,10 @@ export function garden(place: Place, parent: TransformNode, x: number, y: number
     if (i % 2 === 0) {
       const treeY = y + .4;
       place('rod', '#806b56', parent, [px, treeY + 1.1, pz], [.24, 2.3, .24]);
+      for (const side of [-1, 1]) {
+        const branch = place('rod', '#806b56', parent, [px + side * .34, treeY + 1.65, pz], [.12, 1.15, .12]);
+        branch.rotation.z = -side * .65;
+      }
       for (let j = 0; j < 3; j++) place('leaf', j === 1 ? theme.grass : theme.leaf, parent, [px + Math.sin(j * 3) * .65, treeY + 2.3 + j * .55, pz + Math.cos(j * 3) * .45], [1.8 - j * .22, 1.6 - j * .2, 1.7 - j * .2]);
       for (let j = 0; j < 5; j++) {
         const a = j * 2.399;
@@ -121,14 +125,22 @@ export function sceneryChunk(place: Place, parent: TransformNode, course: Course
       const wx = x - side * 7;
       place('water', '#96dad9', parent, [wx, -15, cz + 2], [2.4, 20, .13]);
       for (let j = 0; j < 3; j++) place('water', '#dcf7ef', parent, [wx - .75 + j * .7, -15, cz + 2.1], [.1, 18 - j, .1]);
-      place('leaf', '#d7e9df', parent, [wx, -25, cz + 2], [5, 1.2, 4]);
+      // Overlapping sheets give the falling water thickness; spray breaks its rectangular end.
+      for (let j = 0; j < 4; j++) {
+        place('water', j % 2 ? '#c3eeea' : '#7ecacb', parent, [wx - .9 + j * .6, -16 - j * .25, cz + 2.18 + j * .08], [.48, 18.5 - j * .5, .12]);
+        place('cloud', '#d7e9df', parent, [wx - 1.4 + j * .9, -24.6 + noise(j + index) * .5, cz + 2.2], [2, 1.1, 1.8]);
+      }
     }
     if (side === -1 && index % 3 === 1) {
       const balloon = new TransformNode('striped-balloon', parent.getScene()); balloon.parent = parent; balloon.position.set(x - 12, 13 + noise(index) * 8, cz + 10);
       place('leaf', theme.accent, balloon, [0, 2, 0], [5, 6.5, 5]);
       place('leaf', '#fff0ce', balloon, [0, 2, .1], [2.3, 6.65, 5]);
       place('island', '#9a7755', balloon, [0, -3.7, 0], [1.2, .9, 1]);
-      for (const s of [-1, 1]) place('rod', '#d5bb83', balloon, [s * .8, -2.3, 0], [.06, 3, .06]);
+      for (const s of [-1, 1]) for (const depth of [-.65, .65]) place('rod', '#d5bb83', balloon, [s * .8, -2.3, depth], [.06, 3, .06]);
+      for (const depth of [-.8, .8]) {
+        place('panel', '#dbbc7e', balloon, [0, -3.24, depth], [2.1, .16, .14]);
+        for (let j = -3; j <= 3; j++) place('rod', '#694f3d', balloon, [j * .28, -3.65, depth], [.045, .7, .045]);
+      }
     }
     if (course.id === 'clockwork') {
       place('rod', theme.dark, parent, [x + side * 8, 1, cz + 20], [2.5, 14, 2.5]);

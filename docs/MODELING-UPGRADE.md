@@ -1,6 +1,6 @@
 # Visual/modeling upgrade handoff
 
-Status: **paused, unfinished**, 2026-10-23. Resume this pass before calling the new visuals complete. The last completed gameplay/HUD/music checkpoint is `c494f16`.
+Status: **resumed and polished**, 2026-10-23. Geometry fixes and model/scenery details are implemented; see VERIFICATION.md for current checks and remaining long-course/WebGPU coverage. The last completed gameplay/HUD/music checkpoint is `c494f16`.
 
 ## User direction
 
@@ -21,8 +21,8 @@ The game still looked too low-poly. Add visible detail across birds, obstacles, 
 
 | Asset | Triangles | Approximate raw GLB size |
 | --- | ---: | ---: |
-| Main bird | 49,456 | 1,147 KB |
-| Racing bird LOD | 11,862 | 283 KB |
+| Main bird | 53,416 | 1,233 KB |
+| Racing bird LOD | 12,812 | 304 KB |
 | Obstacle kit | 1,612 | 64 KB |
 | Near audience bird | 2,006 | 50 KB |
 | Far audience bird | 322 | 9 KB |
@@ -38,7 +38,7 @@ npm run assets:check
 
 Blender is not required to run the committed game. Generated GLBs are included; build-time Blender tools are not shipped to the browser.
 
-## Remaining work, in order
+## Original handoff checklist (historical; current results in VERIFICATION.md)
 
 1. **Review geometry and lighting in close-up.** Check front/back culling and normals for the custom ring, sphere and bevelled frame. Inspect every opening shape and moving gate. Check UV seams, normal-map direction and lighting on scaled surfaces. The frame regression passes, but a full visual review is unfinished.
 2. **Resolve the Reduced Motion browser assertion.** Latest run: eight browser tests have no recorded failures; `tests/e2e/game.spec.ts` Reduced Motion check received an empty computed `animationName` instead of `none`. Investigate whether the comic stamp is replaced/detached between visibility and style reads before changing product behavior. This also occurred intermittently before this pass.

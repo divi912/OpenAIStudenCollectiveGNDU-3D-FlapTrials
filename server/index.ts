@@ -38,4 +38,5 @@ export const server = defineServer({
 });
 
 const port = Number(process.env.PORT ?? 2567);
-server.listen(port).then(() => console.log(`Flap Trials server listening on http://localhost:${port}`));
+server.listen(port, '0.0.0.0').then(() => console.log(`Flap Trials server listening on http://localhost:${port}`));
+

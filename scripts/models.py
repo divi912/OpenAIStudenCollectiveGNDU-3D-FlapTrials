@@ -89,6 +89,16 @@ def palette_torus(name, loc, scale, index):
     return o
 for x in [-.35,.35]: details.append(palette_torus('GoggleRim',(x,.45,.73),(.34,.395,.30),7))
 details.append(detail('GoggleBridge',(0,.47,.78),(.075,.045,.07),5))
+# Brass fasteners sit outside the lenses; temple straps follow the head silhouette.
+for side in [-1,1]:
+    details.append(detail('GoggleTemple',(side*.65,.44,.48),(.10,.07,.24),7))
+    details.append(detail('GoggleRivet',(side*.65,.44,.695),(.036,.036,.02),5))
+    details.append(detail('Nostril',(side*.105,.145,1.00),(.029,.018,.038),7))
+# A stitched leather backplate makes the harness legible from the chase camera.
+details.append(detail('HarnessBackplate',(0,-.24,-.735),(.22,.19,.045),7))
+for side in [-1,1]:
+    details.append(detail('BackplateRivet',(side*.14,-.24,-.78),(.027,.027,.016),5))
+
 # Brass stitching, feather shafts and a little aviator badge add readable close detail.
 for side in [-1,1]:
     for j in range(7):

@@ -19,14 +19,16 @@ export function gateShell(points: [number, number][], width: number, depth: numb
     }
     if (i < points.length) for (let j = 0; j < 8; j++) {
       const a = i * 8 + j, b = i * 8 + (j + 1) % 8, c = a + 8, d = b + 8;
-      indices.push(a, c, b, b, c, d);
+      indices.push(a, b, c, b, d, c);
     }
   }
-  VertexData.ComputeNormals(positions, indices, normals, { useRightHandedSystem: true });
+  VertexData.ComputeNormals(positions, indices, normals);
   // The duplicated UV seam shares the same lighting normal.
-  for (let j = 0; j < 24; j++) {
-    const end = points.length * 24 + j, average = (normals[j] + normals[end]) / 2;
-    normals[j] = normals[end] = average;
+  for (let j = 0; j < 24; j += 3) {
+    const end = points.length * 24 + j;
+    const average = [0, 1, 2].map(k => normals[j + k] + normals[end + k]);
+    const length = Math.hypot(...average);
+    for (let k = 0; k < 3; k++) normals[j + k] = normals[end + k] = average[k] / length;
   }
   const data = new VertexData(); data.positions = positions; data.indices = indices; data.normals = normals; data.uvs = uvs;
   return data;

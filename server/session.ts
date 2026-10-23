@@ -2,6 +2,7 @@ import { getCourse, COMPILED_COURSES } from '../shared/courses';
 import { idleInput, stepRacer } from '../shared/physics';
 import { COLORS, cleanName, type InputFrame } from '../shared/protocol';
 import { PlayerSchema, RaceSchema } from '../shared/schema';
+import { PRE_RACE_SECONDS } from '../shared/intro';
 
 export class GameSession {
   readonly state = new RaceSchema();
@@ -62,7 +63,7 @@ export class GameSession {
       if (tick >= s.deadline) for (const [id, p] of s.players) if (!p.loaded || !p.connected) { this.ejected.push(id); this.remove(id); }
       if (s.players.size < 2) { s.phase = 'lobby'; s.deadline = 0; return; }
       if ([...s.players.values()].every(p => p.loaded && p.connected)) {
-        s.phase = 'countdown'; s.startTick = tick + 180;
+        s.phase = 'countdown'; s.startTick = tick + PRE_RACE_SECONDS * 60;
       }
     }
     if (s.phase === 'countdown' && tick >= s.startTick) {

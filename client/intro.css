@@ -1,0 +1,20 @@
+body[data-intro=true] #hud { visibility: hidden; }
+#race-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  color: #fff8e5;
+  border-block: clamp(24px, 5vh, 54px) solid #163c36;
+  background: linear-gradient(180deg, #163c36b3, transparent 32%, transparent 60%, #163c36cc);
+  text-shadow: 0 2px 12px #163c3680;
+}
+.intro-title { position: absolute; top: 24px; left: 6vw; right: 6vw; }
+.intro-title > span { color: #ffdc87; font-size: 11px; letter-spacing: 3px; font-weight: 800; }
+.intro-title h1 { font-family: var(--display); font-size: clamp(30px, 5vw, 66px); font-weight: 500; line-height: 1.05; margin: 10px 0; }
+.intro-title p { font-size: clamp(11px, 1.3vw, 15px); margin: 0; }
+#intro-roster { position: absolute; bottom: 30px; left: 6vw; right: 6vw; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+#intro-roster > span { background: #163c36e6; border: 1px solid #fff8e550; border-bottom: 3px solid var(--bird-color); border-radius: 12px; padding: 10px 15px; font-size: 12px; font-weight: 800; }
+#intro-roster small { color: #ffdc87; margin-left: 8px; font-size: 8px; letter-spacing: 1px; }
+.intro-timeline { position: absolute; bottom: -4px; left: 0; right: 0; height: 4px; background: #fff8e530; }
+.intro-timeline i { display: block; height: 100%; background: #ffdc87; transform-origin: left; transform: scaleX(var(--intro-progress, 0)); }

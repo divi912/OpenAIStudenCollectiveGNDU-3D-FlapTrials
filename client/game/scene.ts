@@ -37,6 +37,8 @@ import { surfaceMap, type Finish } from './surfaces';
 import { garden, sceneryChunk, THEMES } from './scenery';
 import { partyEvent } from '../../shared/party';
 import { frameAt, trackToWorld, bodyRoll } from '../../shared/track';
+import { introShot } from '../../shared/intro';
+import { flightCamera, smoothBank } from './flight-camera';
 
 interface BirdVisual { root: TransformNode; wings: TransformNode[]; beak?: TransformNode; material?: PBRMaterial; meshes: AbstractMesh[]; shield: InstancedMesh }
 interface ObstacleVisual { definition: ObstacleDefinition; root: TransformNode; gem?: InstancedMesh }
@@ -66,6 +68,7 @@ export class GameScene {
   private mode: 'menu' | 'race' = 'menu';
   private follow = new Vector3(0, 8, -7);
   private look = new Vector3(0, 6, 20);
+  private cameraBank = 0;
   private resolution = 1;
   private lastQualityCheck = 0;
   private decorRotors: TransformNode[] = [];
@@ -281,6 +284,7 @@ export class GameScene {
     this.engine.setHardwareScalingLevel(scale); this.engine.resize();
   }
   showMenu() {
+    this.cameraBank = 0; this.camera.upVector.set(0, 1, 0);
     this.mode = 'menu'; this.menuRoot.setEnabled(true); this.courseRoot?.setEnabled(false);
     for (const b of this.birds.values()) b.root.setEnabled(false);
     this.skyMesh.setEnabled(false); this.sunMesh?.setEnabled(false); for (const line of this.streaks) line.setEnabled(false);
@@ -289,6 +293,7 @@ export class GameScene {
     this.canvas.classList.remove('racing'); this.resize();
   }
   showCourse(course: CourseDefinition): void {
+    this.cameraBank = 0; this.camera.upVector.set(0, 1, 0);
     this.mode = 'race'; this.menuRoot.setEnabled(false); this.canvas.classList.add('racing');
     if (this.course?.id !== course.id || !this.courseRoot) this.buildCourse(course);
     this.course = course; this.courseRoot!.setEnabled(true);
@@ -385,7 +390,7 @@ export class GameScene {
     for (let i = 0; i < bird.wings.length; i++) bird.wings[i].rotation.z = (i === 0 ? -1 : 1) * (.15 + Math.sin(seconds * 11) * flap);
     if (bird.beak) bird.beak.rotation.x = Math.sin(seconds * 3) * .06;
   }
-  render(now: number, dt: number, players: PlayerSnapshot[] = [], localId = '', raceSeconds = 0): void {
+  render(now: number, dt: number, players: PlayerSnapshot[] = [], localId = '', raceSeconds = 0, introElapsed?: number): void {
     const seconds = now / 1000;
     if (this.mode === 'menu') {
       for (let i = 0; i < this.menuBirds.length; i++) {
@@ -395,16 +400,31 @@ export class GameScene {
       this.menuRoot.rotation.y = -.1 + (this.settings.reducedMotion ? 0 : Math.sin(seconds * .25) * .025);
     } else {
       const local = players.find(p => p.playerId === localId);
-      if (local) {
+      const shot = introElapsed === undefined ? undefined : introShot(introElapsed, this.course!.length, this.settings.reducedMotion);
+      if (shot) {
+        this.cameraBank = 0; this.camera.upVector.set(0, 1, 0);
+        const spread = Math.max(0, players.length - 1) * 1.15;
+        this.camera.position.set(...trackToWorld(this.course!, shot.side, shot.height + (shot.lineup ? spread * .25 : 0), shot.z + (shot.lineup ? 6 + spread : -18)));
+        this.look.set(...trackToWorld(this.course!, 0, shot.lineup ? 6 : 8, shot.z + (shot.lineup ? 0 : 28)));
+        this.camera.setTarget(this.look); this.follow.copyFrom(this.camera.position); this.camera.fov = .9;
+        this.audience?.update(shot.z, this.settings.quality === 'low');
+        for (const chunk of this.chunks) chunk.root.setEnabled(chunk.z > shot.z - 200 && chunk.z < shot.z + 330);
+        for (const line of this.streaks) line.setEnabled(false);
+      }
+      if (local && !shot) {
         let distance = 7;
         const behind = this.course?.obstacles.find(o => o.z < local.z && local.z - o.z < 8 && isGate(o));
         if (behind) distance = Math.max(3, local.z - behind.z - .7);
         const cameraY = this.settings.reducedMotion ? local.y + Math.max(-1.2, Math.min(1.2, (6.5 - local.y) * .65)) : local.y;
-        temp.set(...trackToWorld(this.course!, local.x * .8, cameraY + 2.1, local.z - distance));
+        const motion = flightCamera(local.heading, local.pitch, local.roll, this.settings.reducedMotion);
+        temp.set(...trackToWorld(this.course!, local.x * .8 - Math.sin(motion.yaw) * distance, cameraY + 2.1 - motion.lift * 2, local.z - Math.cos(motion.yaw) * distance));
         const snap = Vector3.Distance(this.camera.position, temp) > 25;
         if (snap) this.follow.copyFrom(temp); else Vector3.LerpToRef(this.follow, temp, 1 - Math.exp(-dt * 12), this.follow);
-        temp.set(...trackToWorld(this.course!, local.x * .6, cameraY + .45, local.z + 22));
+        temp.set(...trackToWorld(this.course!, local.x * .6 + Math.sin(motion.yaw) * 10, cameraY + .45 + motion.lift * 8, local.z + 22));
         Vector3.LerpToRef(this.look, temp, snap ? 1 : 1 - Math.exp(-dt * 9), this.look);
+        this.cameraBank = this.settings.reducedMotion || snap ? 0 : smoothBank(this.cameraBank, local.status === 'crashed' ? 0 : motion.bank, dt);
+        const cameraFrame = frameAt(this.course!, local.z), bankSine = Math.sin(this.cameraBank);
+        this.camera.upVector.set(cameraFrame.right[0] * bankSine, Math.cos(this.cameraBank), cameraFrame.right[2] * bankSine);
         this.camera.position.copyFrom(this.follow); this.camera.setTarget(this.look);
         this.audience?.update(local.z, this.settings.quality === 'low', this.settings.quality === 'auto' && this.resolution > 1.15);
         for (const chunk of this.chunks) chunk.root.setEnabled(chunk.z > local.z - 200 && chunk.z < local.z + 330);
@@ -420,22 +440,30 @@ export class GameScene {
       for (const visual of this.obstacles) {
         const o = visual.definition;
         const collected = o.kind === 'pickup' && local && !!(local.pickupMask & (1 << o.pickupIndex!));
-        const active = !collected && (!local || (o.z > local.z - 30 && o.z < local.z + 300)); visual.root.setEnabled(active);
+        const visibleZ = shot?.z ?? local?.z;
+        const active = !collected && (visibleZ === undefined || (o.z > visibleZ - 60 && o.z < visibleZ + 300)); visual.root.setEnabled(active);
         if (!active) continue;
         const pose = obstaclePose(o, raceSeconds), f = frameAt(this.course!, o.z); visual.root.position.set(...trackToWorld(this.course!, pose.x, pose.y, o.z)); visual.root.rotationQuaternion = Quaternion.RotationYawPitchRoll(f.yaw, -f.pitch, pose.angle);
         if (visual.gem) { visual.gem.rotation.y = seconds * 1.8; visual.gem.position.y = Math.sin(seconds * 2.5 + o.z) * .17; }
       }
       const seen = new Set<string>();
-      for (const p of players) {
+      for (const [index, p] of players.entries()) {
         seen.add(p.playerId); let bird = this.birds.get(p.playerId);
         if (!bird) { bird = this.bird(p.playerId, p.color, undefined, p.playerId === localId); bird.root.scaling.setAll(.43); this.birds.set(p.playerId, bird); }
         bird.root.setEnabled(p.status !== 'dnf' && p.status !== 'crashed'); bird.root.position.set(...trackToWorld(this.course!, p.x, p.y, p.z));
         this.animateBird(bird, seconds, .25 + Math.max(0, p.vy) * .035, -p.vx * .055, -p.vy * .025);
         const f = frameAt(this.course!, p.z);
         bird.root.rotationQuaternion = Quaternion.RotationYawPitchRoll(f.yaw, -f.pitch, 0).multiply(Quaternion.RotationYawPitchRoll(p.heading, -p.pitch, bodyRoll(p.heading, p.roll)));
-        bird.shield.setEnabled(p.simulationTick < p.shieldUntilTick);
+        if (shot) {
+          // Presentation only: keep the authoritative racers untouched at spawn.
+          bird.root.position.set(...trackToWorld(this.course!, (index - (players.length - 1) / 2) * 2.3, 6 + (this.settings.reducedMotion ? 0 : Math.sin(seconds * 3 + index) * .2), 0));
+          const spawn = frameAt(this.course!, 0);
+          bird.root.rotationQuaternion = Quaternion.RotationYawPitchRoll(spawn.yaw + (this.settings.reducedMotion ? 0 : Math.sin(seconds * 2 + index) * .12), -spawn.pitch, 0);
+          this.animateBird(bird, seconds + index, this.settings.reducedMotion ? .08 : .48);
+        }
+        bird.shield.setEnabled(!shot && p.shieldUntilTick > 0 && p.simulationTick < p.shieldUntilTick);
         const overlap = local && p.playerId !== localId && Math.abs(p.z - local.z) < 5 && Math.abs(p.x - local.x) < 1.4 && Math.abs(p.y - local.y) < 1.4;
-        for (const mesh of bird.meshes) mesh.visibility = overlap ? .28 : 1;
+        for (const mesh of bird.meshes) mesh.visibility = overlap && !shot ? .28 : 1;
       }
       for (const [id, bird] of this.birds) if (!seen.has(id)) { bird.root.dispose(false, false); bird.material?.dispose(); this.birds.delete(id); }
     }
@@ -453,6 +481,17 @@ export class GameScene {
     presentFrame(this.engine, this.scene);
   }
   private boxPose(mesh: InstancedMesh, box: Box) { mesh.position.set(...box.center); mesh.scaling.set(box.half[0] * 2, box.half[1] * 2, box.half[2] * 2); mesh.rotation.z = box.angle ?? 0; }
+  birdMarker(id: string): { x: number; y: number } | undefined {
+    const bird = this.birds.get(id);
+    if (this.mode !== 'race' || !bird?.root.isEnabled()) return;
+    const world = bird.root.position.add(new Vector3(0, 1.35, 0));
+    if (Vector3.DistanceSquared(world, this.camera.position) > 160 * 160) return;
+    const width = this.engine.getRenderWidth(), height = this.engine.getRenderHeight();
+    const point = Vector3.Project(world, Matrix.Identity(), this.scene.getTransformMatrix(), this.camera.viewport.toGlobal(width, height));
+    const x = point.x / width * 100, y = point.y / height * 100;
+    if (point.z > 0 && point.z < 1 && x > 2 && x < 98 && y > 3 && y < 98) return { x, y };
+  }
+  get cameraMotion() { return { bank: this.cameraBank, up: this.camera.upVector.asArray(), position: this.camera.position.asArray() }; }
   gateMarker(player: RacerState, seconds: number): { x: number; y: number } | undefined {
     if (!this.course) return;
     const gate = this.course.obstacles.find(o => isGate(o) && o.z > player.z + 1);

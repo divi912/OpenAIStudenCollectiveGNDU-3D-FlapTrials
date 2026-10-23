@@ -9,7 +9,7 @@ const server = defineServer({ rooms: { race: defineRoom(RaceRoom).filterBy(['isP
 const clients: Room<any, RaceSchema>[] = [];
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 async function until(check: () => boolean) {
-  const end = Date.now() + 8000;
+  const end = Date.now() + 12000;
   while (Date.now() < end) { if (check()) return; await delay(25); }
   throw new Error('Room transition timed out');
 }

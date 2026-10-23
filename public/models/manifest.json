@@ -7,11 +7,11 @@
   "assets": [
     {
       "file": "bird.glb",
-      "bytes": 1174740
+      "bytes": 1262440
     },
     {
       "file": "bird-lod.glb",
-      "bytes": 290248
+      "bytes": 311788
     },
     {
       "file": "obstacle-kit.glb",

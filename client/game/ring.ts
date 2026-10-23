@@ -12,7 +12,7 @@ export function ringData(): VertexData {
     uvs.push(i / around, j / radial);
     if (i < around && j < radial) {
       const k = i * (radial + 1) + j, next = k + radial + 1;
-      indices.push(k, next, k + 1, k + 1, next, next + 1);
+      indices.push(k, k + 1, next, k + 1, next + 1, next);
     }
   }
   const data = new VertexData(); data.positions = positions; data.normals = normals; data.uvs = uvs; data.indices = indices; return data;

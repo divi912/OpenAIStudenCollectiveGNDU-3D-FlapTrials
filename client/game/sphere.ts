@@ -9,8 +9,8 @@ export function sphereData(longitude = 16, latitude = 8): VertexData {
     positions.push(nx * .5, ny * .5, nz * .5); normals.push(nx, ny, nz); uvs.push(x / longitude, y / latitude);
     if (x < longitude && y < latitude) {
       const i = y * (longitude + 1) + x, j = i + longitude + 1;
-      if (y > 0) indices.push(i, i + 1, j);
-      if (y < latitude - 1) indices.push(i + 1, j + 1, j);
+      if (y > 0) indices.push(i, j, i + 1);
+      if (y < latitude - 1) indices.push(i + 1, j, j + 1);
     }
   }
   const data = new VertexData(); data.positions = positions; data.normals = normals; data.uvs = uvs; data.indices = indices; return data;

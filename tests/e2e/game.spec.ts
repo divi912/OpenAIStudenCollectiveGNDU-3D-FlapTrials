@@ -130,5 +130,6 @@ test('the in-game reduced-motion preference suppresses comic stamp animation', a
   await page.getByRole('button', { name: 'All set' }).click();
   await page.getByRole('button', { name: 'Solo practice' }).click();
   await expect(page.locator('.comic-stamp')).toBeVisible({ timeout: 12000 });
-  expect(await page.locator('.comic-stamp').evaluate(el => getComputedStyle(el).animationName)).toBe('none');
+  // The short-lived cue can be replaced between reads; poll a fresh locator and style together.
+  await expect(page.locator('.comic-stamp')).toHaveCSS('animation-name', 'none');
 });

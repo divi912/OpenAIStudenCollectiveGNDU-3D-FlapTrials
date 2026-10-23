@@ -8,7 +8,7 @@ let processHandle: ChildProcess;
 const rooms: Room<any, RaceSchema>[] = [];
 const endpoint = 'http://127.0.0.1:2568';
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-async function until(check: () => boolean | Promise<boolean>, ms = 10000) {
+async function until(check: () => boolean | Promise<boolean>, ms = 15000) {
   const end = Date.now() + ms;
   while (Date.now() < end) { if (await check()) return; await delay(25); }
   throw new Error('Timed out waiting for authoritative state');
@@ -48,4 +48,4 @@ it('keeps authority, reconnects the same racer and retains a voluntary quitter a
   expect(c.sessionId).toBe(id); expect(a.state.startTick).toBe(startTick);
   await c.leave(); await until(() => a.state.players.get(id)?.status === 'dnf');
   expect(a.state.players.has(id)).toBe(true); expect(a.state.players.get(id)!.connected).toBe(false);
-}, 25000);
+}, 35000);
