@@ -1,4 +1,29 @@
-# Cloudflare Pages and LAN-hosted multiplayer
+# Cloudflare Workers hosting and LAN multiplayer
+
+## Public website: Workers Static Assets
+
+`flaptrials.divii.xyz` is hosted directly by the existing Worker
+`openaistudencollectivegndu-3d-flaptrials`, using Workers Static Assets.
+`wrangler.jsonc` uploads only `dist/client` and attaches the custom domain.
+No proxy Worker or Pages origin is required. Cloudflare manages the Worker's
+domain routing and underlying DNS; DNS is still involved, but no separate
+Pages CNAME needs to be managed manually.
+
+To deploy after changes, authenticate with `npx wrangler@4.152.0 login`, then run:
+
+```sh
+npm run deploy:cloudflare
+```
+
+For a Git-connected Workers Build, select this repository and the
+`codex/model-polish` branch, set build command `npm run build`, and deploy
+command `npx wrangler@4.152.0 deploy --keep-vars`. The checked-in config supplies
+the Worker name, assets directory and custom domain. A local Wrangler deploy
+does not itself enable Git-triggered builds.
+
+The public site supports solo practice. Workers Static Assets does not run the
+existing Node/Colyseus multiplayer server. Use the LAN instructions below to
+play together locally.
 
 ## Current play mode: one player hosts on their PC
 
@@ -16,9 +41,9 @@ The server binds to `0.0.0.0:2567` so other LAN devices can reach it. The server
 
 The host terminal must stay open, and the host PC must stay awake and connected. This mode is for a shared LAN; it does not let friends join across the public internet. Do not expose port 2567 to the internet or create a router port-forward for this setup.
 
-## Cloudflare Pages role
+## Optional Cloudflare Pages deployment
 
-Cloudflare Pages can host the static site at `flaptrials.divii.xyz` using build command `npm run build` and output directory `dist/client`; use Node.js 24. Add `flaptrials.divii.xyz` to the Pages project's Custom Domains after its first deployment. The included `public/_headers` applies immutable caching to Vite's content-hashed assets and basic response headers.
+The existing Pages project remains available at `flap-trials.pages.dev`, using build command `npm run build` and output directory `dist/client` with Node.js 24. The primary custom domain belongs to the Worker, not Pages. The included `public/_headers` applies immutable caching to Vite's content-hashed assets and basic response headers on both static hosting options.
 
 A Pages-hosted browser cannot start a Node server on the player's computer. For LAN multiplayer, all participants need the host's LAN URL above, which serves both client and server from the host PC. They should not use the public Pages URL to join the LAN room. Cloudflare can host the landing page/game download, while authoritative multiplayer continues to run on the room creator's computer. A future direct Pages-to-LAN connection would need a secure runtime configuration and HTTPS/WSS compatibility on the local host; this setup intentionally avoids that complication.
 

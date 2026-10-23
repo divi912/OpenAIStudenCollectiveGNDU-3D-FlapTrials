@@ -2,6 +2,7 @@ node_modules/
 dist/
 .tools/
 .cache/
+.wrangler/
 test-results/
 playwright-report/
 .env.local

@@ -21,7 +21,8 @@
     "assets:build": "node scripts/build-assets.mjs",
     "assets:check": "node scripts/check-assets.mjs",
     "loadtest": "tsx scripts/loadtest.ts",
-    "lan": "npm run build && node scripts/lan-server.mjs"
+    "lan": "npm run build && node scripts/lan-server.mjs",
+    "deploy:cloudflare": "npm run build && npx --yes wrangler@4.152.0 deploy --keep-vars"
   },
   "dependencies": {
     "@babylonjs/core": "^9.32.0",
