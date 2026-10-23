@@ -2,6 +2,10 @@ import './styles.css';
 import './cockpit.css';
 import './intro.css';
 import './nametags.css';
+import './loading.css';
+import { LoadingFeedback } from './loading';
+import { connectionError } from './network/availability';
+import type { ServerHealth } from '../shared/server-health';
 import { NameTags } from './game/nametags';
 import { GameScene } from './game/scene';
 import { Controls } from './game/input';
@@ -23,6 +27,8 @@ app.insertAdjacentHTML('beforeend', '<div id="bird-names" aria-hidden="true"></d
 const nameContainer = document.querySelector<HTMLDivElement>('#bird-names')!;
 const nameTags = new NameTags(nameContainer);
 const p = preferences(), controls = new Controls(), audio = new GameAudio(), connection = new Connection();
+const loading = new LoadingFeedback(app, () => connection.cancelConnect());
+connection.progress = state => loading.connection(state);
 audio.volume = p.volume;
 audio.musicVolume = p.musicVolume;
 document.body.dataset.reducedMotion = String(p.reducedMotion);
@@ -82,13 +88,14 @@ function showResults(players: PlayerSnapshot[], selfId: string, courseId: string
   setModal(resultsModal(players, selfId, course, startTick, isPractice, pb), 'results');
   if (me) modal.querySelector('.results-summary')?.insertAdjacentHTML('afterend', `<div class="result-flight-stats"><span><b>${me.styleScore.toLocaleString()}</b>STYLE POINTS</span><span><b>${me.trickCount}</b>BARREL ROLLS</span><span><b>${me.bestStreak}</b>BEST CLEAN STREAK</span></div>`);
 }
-async function leave() { await connection.leave(); showHome(); }
+async function leave() { await connection.leave(); loading.hide(); showHome(); }
 connection.notice = toast;
-connection.lost = () => { toast('You left the room. Your wings are always welcome back.'); showHome(); };
+connection.lost = () => { loading.hide(); toast('The room connection closed. You can rejoin or start a new race.'); showHome(); };
 connection.changed = () => {
   const room = connection.room; if (!room) return;
   const s = room.state;
   if (s.phase === 'lobby') {
+    loading.hide();
     if (view !== 'home') { showHome(); resetFeedback(); }
     const signature = JSON.stringify([s.courseId, s.hostId, s.raceId, !!s.deadline, [...s.players.values()].map(v => [v.playerId, v.ready, v.connected])]);
     if (modalKind === 'settings' || modalKind === 'help') return;
@@ -96,11 +103,14 @@ connection.changed = () => {
   } else if (s.phase === 'loading') {
     if (view !== 'race' || raceCourse !== s.courseId) { resetFeedback(); openRace(s.courseId, false); setModal('', ''); }
     if (scene?.ready) connection.action('loaded');
+    loading.race([...s.players.values()].filter(v => v.loaded).length, s.players.size, (s.deadline - s.tick) / 60, !!scene?.ready);
   } else if (s.phase === 'countdown' || s.phase === 'racing') {
+    loading.hide();
     if (view !== 'race' || raceCourse !== s.courseId) openRace(s.courseId, false);
     if (modalKind === 'lobby' || modalKind === 'loading') closeModal();
     controls.enabled = !modalKind && s.phase === 'racing';
   } else if (s.phase === 'results') {
+    loading.hide();
     showResults([...s.players.values()].map(v => v.toJSON() as PlayerSnapshot), room.sessionId, s.courseId, s.startTick, false);
   }
 };
@@ -116,7 +126,7 @@ document.addEventListener('click', async event => {
     case 'home': if (!connection.room && view === 'home') closeModal(); break;
     case 'help': setModal(helpModal(), 'help'); break;
     case 'settings': setModal(settingsModal(p, scene?.renderer ?? 'Loading', view === 'race'), 'settings'); break;
-    case 'close': if (modalKind === 'lobby' || modalKind === 'results') await leave(); else if (connection.room?.state.phase === 'lobby') { lobbySignature = ''; modalKind = ''; connection.changed(); } else closeModal(); break;
+    case 'close': if (modalKind === 'profile') connection.cancelConnect(); if (modalKind === 'lobby' || modalKind === 'results') await leave(); else if (connection.room?.state.phase === 'lobby') { lobbySignature = ''; modalKind = ''; connection.changed(); } else closeModal(); break;
     case 'practice': startPractice(); break;
     case 'course': selected = target.dataset.course!; document.querySelector('#course-grid')!.innerHTML = courseCards(selected); break;
     case 'quick': case 'create': case 'join': setModal(profileModal(action, p), 'profile'); break;
@@ -146,7 +156,7 @@ document.addEventListener('submit', async event => {
   try {
     await connection.connect(form.dataset.mode as 'create' | 'quick' | 'join', p.name, p.color, String(data.get('code') ?? '').trim(), selected);
   } catch (cause) {
-    error.textContent = cause instanceof Error ? (cause.message.includes('fetch') || cause.message.includes('Network') ? 'The multiplayer server is taking a breather. Make sure it is running, or try solo practice.' : cause.message) : 'Could not connect. Please try again.';
+    error.textContent = connectionError(cause);
     submit.disabled = false; submit.innerHTML = `Try again ${icon('arrow')}`;
   }
 });
@@ -173,7 +183,15 @@ document.addEventListener('visibilitychange', () => { audio.setHidden(document.h
 
 async function updateServerStatus() {
   const text = document.querySelector('#server-status-text'); if (!text) return;
-  try { const response = await fetch(`${SERVER_URL}/health`, { signal: AbortSignal.timeout(2500) }); if (!response.ok) throw new Error('offline'); text.textContent = 'The sky is open'; document.querySelector('.server-status')?.classList.add('online'); }
+  try {
+    const response = await fetch(`${SERVER_URL}/health`, { signal: AbortSignal.timeout(2500), cache: 'no-store' });
+    if (!response.ok) throw new Error('offline');
+    const health = await response.json() as ServerHealth;
+    if (health.status !== 'ok') throw new Error('not a multiplayer server');
+    const full = health.capacity && !health.capacity.acceptingNewRooms && health.capacity.availablePublicSeats === 0;
+    text.textContent = full ? 'All rooms busy · join with a code' : `Multiplayer ready${health.capacity ? ` · ${health.rooms}/${health.capacity.maxRooms} rooms` : ''}`;
+    document.querySelector('.server-status')?.classList.toggle('online', !full);
+  }
   catch { text.textContent = 'Solo practice ready'; document.querySelector('.server-status')?.classList.remove('online'); }
 }
 function cue(html: string, duration = 0) { const el = document.querySelector('#center-cue'); if (el) el.innerHTML = html; if (duration) cueUntil = performance.now() + duration; }
@@ -263,19 +281,22 @@ function frame(now: number) {
 }
 
 showHome();
+const slowBoot = window.setTimeout(() => { const note = document.querySelector('#boot-note'); if (note) note.textContent = 'Still loading the 3D birds and stadium. Please keep this tab open…'; }, 5000);
 GameScene.create(document.querySelector<HTMLCanvasElement>('#world')!, p).then(result => {
+  clearTimeout(slowBoot);
   scene = result;
   if (view === 'race' && raceCourse) result.showCourse(getCourse(raceCourse).definition); else result.showMenu();
   connection.changed();
   document.querySelector('#boot-note')?.remove();
   document.body.dataset.renderer = result.renderer; requestAnimationFrame(frame);
 }).catch(error => {
+  clearTimeout(slowBoot);
   console.error('Could not initialize the game renderer:', error);
   const note = document.querySelector('#boot-note')!;
   note.textContent = 'The 3D world could not load. Try a current browser with hardware acceleration enabled, then refresh.';
   note.classList.add('boot-error');
 });
-setInterval(() => void updateServerStatus(), 30000);
+setInterval(() => { if (!document.hidden && !connection.room && !practice) void updateServerStatus(); }, 60000);
 
 // Read-only diagnostics for browser automation and local profiling; never an authority channel.
-Object.defineProperty(window, '__flap', { get: () => ({ audio: audio.stats, view, courseId: raceCourse || selected, renderer: scene?.renderer, stats: scene?.stats, camera: scene?.cameraMotion, practice: practice ? { ...practice } : undefined, room: connection.room?.state.toJSON(), sessionId: connection.room?.sessionId }) });
+Object.defineProperty(window, '__flap', { get: () => ({ audio: audio.stats, view, courseId: raceCourse || selected, renderer: scene?.renderer, stats: scene?.stats, camera: scene?.cameraMotion, network: { sentInputs: connection.sentInputs }, practice: practice ? { ...practice } : undefined, room: connection.room?.state.toJSON(), sessionId: connection.room?.sessionId }) });

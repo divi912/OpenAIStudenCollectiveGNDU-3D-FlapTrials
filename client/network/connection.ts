@@ -4,6 +4,10 @@ import { PHYSICS_VERSION, PROTOCOL_VERSION, type InputFrame, type PlayerSnapshot
 import { getCourse } from '../../shared/courses';
 import { stepRacer } from '../../shared/physics';
 import type { Data } from '@colyseus/schema';
+import { waitForServer } from './availability';
+import { canRequestRoom } from '../../shared/server-health';
+
+export interface ConnectionProgress { kind: 'connecting' | 'reconnecting'; title: string; detail: string }
 
 export const SERVER_URL = (import.meta.env.VITE_SERVER_URL as string | undefined) ?? (import.meta.env.DEV ? `${location.protocol}//${location.hostname}:2567` : location.origin);
 export class Connection {
@@ -15,19 +19,39 @@ export class Connection {
   private sequence = 0;
   private lastRaceId = -1;
   private attached = false;
+  private pending?: AbortController;
+  sentInputs = 0;
+  progress = (_state: ConnectionProgress | undefined) => {};
   private renderPlayers = new Map<string, PlayerSnapshot>();
   changed = () => {};
   notice = (_text: string) => {};
   lost = () => {};
   async connect(mode: 'create' | 'quick' | 'join', name: string, color: string, code = '', courseId = 'skyline_sprint'): Promise<void> {
+    if (this.pending || this.room) throw new Error('You are already connecting or in a room.');
+    const pending = this.pending = new AbortController();
+    this.progress({ kind: 'connecting', title: 'Contacting the multiplayer server…', detail: 'Free servers can take about a minute to wake up. You can cancel and play solo.' });
+    try {
+      const health = await waitForServer(SERVER_URL, pending.signal);
+      if (!canRequestRoom(health, mode)) throw new Error('Server full: all rooms are busy.');
+      this.progress({ kind: 'connecting', title: mode === 'join' ? 'Joining your flock…' : mode === 'quick' ? 'Finding an open race…' : 'Creating your room…', detail: 'Reserving your place and opening a secure connection.' });
+      await this.openRoom(mode, name, color, code, courseId, pending);
+    } catch (cause) {
+      if (pending.signal.aborted) throw new Error('Connection cancelled.');
+      throw cause;
+    } finally {
+      if (this.pending === pending) { this.pending = undefined; this.progress(undefined); }
+    }
+  }
+  private async openRoom(mode: 'create' | 'quick' | 'join', name: string, color: string, code: string, courseId: string, pending: AbortController): Promise<void> {
     const options = { name, color, protocolVersion: PROTOCOL_VERSION, physicsVersion: PHYSICS_VERSION, isPublic: mode === 'quick', courseId };
     let room: Room<any, RaceSchema>;
     if (mode === 'join') {
-      const response = await fetch(`${SERVER_URL}/api/rooms/${encodeURIComponent(code.toUpperCase())}`);
+      const response = await fetch(`${SERVER_URL}/api/rooms/${encodeURIComponent(code.toUpperCase())}`, { signal: pending.signal });
       const result = await response.json(); if (!response.ok) throw new Error(result.error ?? 'Could not find that room.');
       room = await this.client.joinById<RaceSchema>(result.roomId, options, RaceSchema);
     } else if (mode === 'quick') room = await this.client.joinOrCreate<RaceSchema>('race', options, RaceSchema);
     else room = await this.client.create<RaceSchema>('race', options, RaceSchema);
+    if (pending.signal.aborted) { room.reconnection.enabled = false; await room.leave(); throw new Error('Connection cancelled.'); }
     this.room = room;
     room.reconnection.enabled = true;
     this.predictor = Predict.get(room, { mode: 'lerp', delay: 100 });
@@ -53,16 +77,21 @@ export class Connection {
     });
     room.onMessage('notice', text => this.notice(String(text)));
     room.onError((_code, message) => this.notice(message ?? 'The connection hit a bump. Please rejoin the room.'));
-    room.onDrop(() => this.notice('Connection interrupted. Reconnecting… the race clock continues.'));
-    room.onReconnect(() => { this.reconciler?.reset(); this.notice('Back in the sky.'); });
-    room.onLeave(() => { if (this.room === room) { this.room = undefined; this.disposePrediction(); this.lost(); } });
+    room.onDrop(() => { this.progress({ kind: 'reconnecting', title: 'Connection interrupted. Reconnecting…', detail: 'The race clock continues. Your place is held for up to 10 seconds during a race.' }); });
+    room.onReconnect(() => { this.reconciler?.reset(); this.progress(undefined); this.notice('Back in the sky.'); });
+    room.onLeave(() => { if (this.room === room) { this.room = undefined; this.disposePrediction(); this.progress(undefined); this.lost(); } });
   }
+  cancelConnect() { this.pending?.abort(); this.progress(undefined); }
   step(now: number, read: (sequence: number, tick: number) => InputFrame): void {
     if (!this.room || !this.predictor || !this.input || !this.reconciler) return;
     const n = Math.min(8, this.predictor.tick(now));
+    // Keep prediction's clock current, but send flight inputs only while flying.
+    if (this.room.state.phase !== 'racing' || !this.room.connection.isOpen) return;
+    const player = this.room.state.players.get(this.room.sessionId);
+    if (!player || player.status === 'finished' || player.status === 'dnf') return;
     for (let i = 0; i < n; i++) {
       const command = read(++this.sequence, this.room.state.tick);
-      Object.assign(this.input.data, command, { raceId: this.room.state.raceId }); this.input.send();
+      Object.assign(this.input.data, command, { raceId: this.room.state.raceId }); this.input.send(); this.sentInputs++;
     }
   }
   players(): PlayerSnapshot[] {
@@ -83,9 +112,13 @@ export class Connection {
   }
   get local(): PlayerSchema | undefined { return this.reconciler?.state; }
   get latency(): number { return Math.round(this.room?.clock.rtt() ?? 0); }
-  action(type: string, value?: unknown) { this.room?.send('action', { type, value, raceId: this.room.state.raceId, hash: this.room.state.courseHash }); }
+  action(type: string, value?: unknown) {
+    if (type === 'loaded' && this.room?.state.players.get(this.room.sessionId)?.loaded) return;
+    this.room?.send('action', { type, value, raceId: this.room.state.raceId, hash: this.room.state.courseHash });
+  }
   private disposePrediction() { this.reconciler?.dispose(); this.predictor?.dispose(); this.reconciler = undefined; this.predictor = undefined; this.input = undefined; this.renderPlayers.clear(); this.lastRaceId = -1; this.attached = false; }
   async leave() {
+    this.cancelConnect();
     const room = this.room; this.room = undefined; this.disposePrediction();
     if (!room) return;
     room.reconnection.enabled = false;

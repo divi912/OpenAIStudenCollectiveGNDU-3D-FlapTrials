@@ -1,10 +1,10 @@
-import { Room, type Client } from '@colyseus/core';
+import { Room, ServerError, type Client } from '@colyseus/core';
 import { randomInt } from 'node:crypto';
 import { FlightInput, RaceSchema } from '../../shared/schema';
-import { idleInput } from '../../shared/physics';
 import { PHYSICS_VERSION, PROTOCOL_VERSION, type InputFrame } from '../../shared/protocol';
 import { GameSession } from '../session';
 import { COURSES } from '../../shared/courses';
+import { roomLimit } from '../config';
 
 export const liveRooms = new Map<string, RaceRoom>();
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -34,7 +34,7 @@ export class RaceRoom extends Room<{ state: RaceSchema; input: FlightInput }> {
     return { players: this.state.players.size, phase: this.state.phase, p95TickMs: +(sorted[Math.floor(sorted.length * .95)] ?? 0).toFixed(3), maxInputQueue: Math.max(0, ...[...this.state.players.keys()].map(id => this.inputs.get(id).size)) };
   }
   onCreate(options: { isPublic?: boolean; courseId?: string }): void {
-    if (liveRooms.size >= Number(process.env.MAX_ROOMS ?? 10)) throw new Error('All nests are busy. Please try again shortly.');
+    if (liveRooms.size >= roomLimit()) throw new ServerError(503, 'Server full: all rooms are busy. Join an existing room or try again after a race ends.');
     this.model = new GameSession(!!options.isPublic, newCode(), options.isPublic ? COURSES[randomInt(COURSES.length)].id : options.courseId); this.state = this.model.state;
     liveRooms.set(this.state.code, this); this.setPatchRate(50);
     this.setMetadata({ code: this.state.code, isPublic: this.state.isPublic, phase: 'lobby' });
@@ -85,5 +85,5 @@ export class RaceRoom extends Room<{ state: RaceSchema; input: FlightInput }> {
       if (this.state.hostId === client.sessionId) this.state.hostId = [...this.state.players.values()].find(v => v.connected)?.playerId ?? '';
     }
   }
-  onDispose(): void { liveRooms.delete(this.state.code); }
+  onDispose(): void { if (this.state) liveRooms.delete(this.state.code); }
 }

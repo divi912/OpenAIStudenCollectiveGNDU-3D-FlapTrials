@@ -52,14 +52,18 @@ test('two browsers start the same race even when a guest joins before its models
   await b.getByRole('button', { name: 'Join the flock' }).click();
   await expect(b.getByRole('heading', { name: 'The flock is gathering.' })).toBeVisible();
   await expect(a.locator('.player-row')).toHaveCount(2);
+  expect(await a.evaluate(() => (window as any).__flap.network.sentInputs)).toBe(0);
   await b.getByRole('button', { name: 'Ready up', exact: true }).click();
   await a.getByRole('button', { name: 'Ready up', exact: true }).click();
   await expect(a.getByRole('button', { name: 'Start the race' })).toBeEnabled();
   await a.getByRole('button', { name: 'Start the race' }).click();
   await b.waitForFunction(() => (window as any).__flap.room?.phase === 'loading');
+  await expect(b.locator('#loading-feedback')).toContainText('Loading birds and stadium');
   expect(await b.evaluate(() => (window as any).__flap.renderer)).toBeUndefined();
   releaseModels();
   for (const page of [a, b]) await page.waitForFunction(() => (window as any).__flap.room?.phase === 'racing', { timeout: 15000 });
+  await expect(a.locator('#loading-feedback')).toBeHidden();
+  await a.waitForFunction(() => (window as any).__flap.network.sentInputs > 0);
   expect(await b.evaluate(() => (window as any).__flap.stats.mode)).toBe('race');
   expect(await b.evaluate(() => (window as any).__flap.stats.courseId)).toBe('skyline_sprint');
   const [first, second] = await Promise.all([a.evaluate(() => (window as any).__flap.room), b.evaluate(() => (window as any).__flap.room)]);
