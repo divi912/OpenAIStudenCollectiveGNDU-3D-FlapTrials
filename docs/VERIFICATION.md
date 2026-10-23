@@ -1,17 +1,26 @@
-# Model polish verification — 2026-10-23
+# Model polish verification ï¿½ 2026-10-23
 
 - Fixed reversed triangle winding in custom spheres, rings and bevelled frames for Babylon's default left-handed scene. Normalized averaged gate seam normals. Three new regressions check finite positions, unit normals, nondegenerate faces and winding; existing all-course aperture-clearance test also passes.
 - Added bird goggle temples/brass rivets, nostrils and a leather harness backplate. Regenerated bird and LOD GLBs and editable Blender sources using portable Blender 4.5.9. Main: 53,416 triangles / 1,262,440 bytes. LOD: 12,812 triangles / 311,788 bytes. Both retain five meshes and wing/beak pivots.
 - Added tree branches, layered waterfall sheets/spray and balloon basket struts/rim. Existing instancing and chunk visibility remain.
 - Reduced Motion browser assertion now retries the current locator's computed CSS instead of doing a separate one-shot style read on a short-lived cue. Product behavior is unchanged.
 - Final verification: **58 unit/integration tests passed**, typecheck and production build passed, asset validation passed, diff whitespace check passed. **9 browser tests passed** in 53.2s with Chromium's D3D11 backend against the local development server on port 5174. Initial concurrent software-rendered run had four timing/navigation failures; the clean hardware run passed all nine.
-- Production screenshots captured for home and all six course openings with no page errors. Adapter reported `ANGLE (AMD, AMD Radeon(TM) Graphics, Direct3D11)`. At 1440x1050, sampled FPS were Skyline 60, Needle 60, Crosswind 60, Clockwork 60, Terminal 59, Featherless 56. Active triangles ranged from 912,764 to 946,920; crowd used 6 draw calls. These are brief opening-scene samples, not sustained full-course benchmarks. Software rendering reported 2–4 FPS and must not be confused with these hardware results.
+- Production screenshots captured for home and all six course openings with no page errors. Adapter reported `ANGLE (AMD, AMD Radeon(TM) Graphics, Direct3D11)`. At 1440x1050, sampled FPS were Skyline 60, Needle 60, Crosswind 60, Clockwork 60, Terminal 59, Featherless 56. Active triangles ranged from 912,764 to 946,920; crowd used 6 draw calls. These are brief opening-scene samples, not sustained full-course benchmarks. Software rendering reported 2ï¿½4 FPS and must not be confused with these hardware results.
 - Independent code review found no actionable correctness issues. Remaining coverage: sustained full-course performance, distant/moving gate close-ups throughout each course, and WebGPU validation. No public deployment or gameplay changes.
 - Local evidence: `.cache/hardware/report.json`, `.cache/hardware/*.png`, `.cache/hardware-e2e.log`, `.cache/unit-polish-final.log`, `.cache/build-polish.log`. Re-run hardware tests using `npx playwright test --config .cache/playwright.hardware.config.ts` while the dev client is on port 5174 and game server on 2567.
 
 ---
 
 # Local verification â€” 2026-10-22
+
+## Server feedback and hosted multiplayer â€” 2026-10-23
+
+- 70 unit/integration tests pass, including capacity admission, canonical configured origins, cold-start retry/cancellation, and existing authority/reconnection tests. Four focused browser tests pass: delayed-model multiplayer startup, closed-connection leave, full-server feedback and cold-start cancellation.
+- Lobby clients send zero flight input frames. Input sending remains 60 Hz during racing, with 20 Hz server patches unchanged; finished/DNF racers stop sending unnecessary input frames. Loaded acknowledgements stop once the server confirms readiness. Home-page health polling is reduced to once a minute and skipped while hidden, practising or in a room. No synthetic keep-awake service is introduced.
+- Server lifecycle hot paths avoid temporary player arrays and reuse an immutable neutral input. This reduces allocation work without changing flight rules, timers, capacities or simulation rates. There is no controlled before/after CPU/RSS claim.
+- A fresh local 70-second run with 10 rooms Ã— 8 racers sent 336,960 legal input frames; all 80 racers finished. Maximum sampled server RSS was 250 MB, maximum per-room p95 callback work 0.301 ms, and queue depth 3. This is a local regression/capacity check, not a promise that Render's free CPU can support 80 players.
+- `/health` publishes room capacity without caching; the client preflight never blocks joining an existing room merely because no new rooms can be created. Authoritative admission still rechecks capacity to handle races between requests.
+- Hosted frontend uses a separate Cloudflare build mode, leaving local/LAN builds unchanged. `CLIENT_ORIGIN` is canonicalized once at startup; trailing hostname dots/slashes are normalized, malformed/path-bearing origins fail startup, and arbitrary request origins are never reflected.
 
 ## Minimal HUD, solid audience and soundtrack
 

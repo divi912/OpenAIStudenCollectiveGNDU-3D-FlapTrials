@@ -4,14 +4,15 @@ import { COURSES } from '../shared/courses';
 import express from 'express';
 import { resolve } from 'node:path';
 import compression from 'compression';
+import { clientOrigin, roomLimit } from './config';
 
 const requests = new Map<string, { time: number; count: number }>();
+const origin = clientOrigin(process.env.CLIENT_ORIGIN);
 export const server = defineServer({
   rooms: { race: defineRoom(RaceRoom).filterBy(['isPublic']) },
   express: app => {
     app.use(compression());
     app.use((req, res, next) => {
-      const origin = process.env.CLIENT_ORIGIN ?? '*';
       res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
       if (req.method === 'OPTIONS') { res.sendStatus(204); return; }
@@ -24,7 +25,17 @@ export const server = defineServer({
       }
       next();
     });
-    app.get('/health', (_req, res) => res.json({ status: 'ok', rooms: liveRooms.size, players: [...liveRooms.values()].reduce((n, r) => n + r.state.players.size, 0), memoryMB: Math.round(process.memoryUsage().rss / 1048576), simulation: [...liveRooms.values()].map(r => r.metrics), uptime: Math.round(process.uptime()) }));
+    app.get('/health', (_req, res) => {
+      let players = 0, availablePublicSeats = 0;
+      const simulation = [];
+      for (const room of liveRooms.values()) {
+        players += room.state.players.size;
+        if (room.state.isPublic && room.state.phase === 'lobby' && !room.locked) availablePublicSeats += room.maxClients - room.state.players.size;
+        simulation.push(room.metrics);
+      }
+      res.setHeader('Cache-Control', 'no-store');
+      res.json({ status: 'ok', rooms: liveRooms.size, players, capacity: { maxRooms: roomLimit(), maxPlayersPerRoom: 8, acceptingNewRooms: liveRooms.size < roomLimit(), availablePublicSeats }, memoryMB: Math.round(process.memoryUsage().rss / 1048576), simulation, uptime: Math.round(process.uptime()) });
+    });
     app.get('/api/rooms/:code', (req, res) => {
       const room = liveRooms.get(String(req.params.code).toUpperCase());
       if (!room) { res.status(404).json({ error: 'That nest could not be found. Check the room code.' }); return; }

@@ -118,13 +118,13 @@ npm start
 
 The Node server serves the production client at **http://localhost:2567**. Build output is separated into `dist/client` and `dist/server`.
 
-The public frontend at **https://flaptrials.divii.xyz** is hosted directly by **Cloudflare Workers Static Assets**, configured in `wrangler.jsonc`. Run `npm run deploy:cloudflare` to build and deploy it after authenticating with Wrangler. This uploads only the client; the Node multiplayer server still runs locally for LAN play.
+The public frontend at **https://flaptrials.divii.xyz** is hosted directly by **Cloudflare Workers Static Assets**, configured in `wrangler.jsonc`. Run `npm run deploy:cloudflare` to build and deploy it after authenticating with Wrangler. Its Cloudflare-mode build uses `.env.cloudflare` to connect to the hosted Render multiplayer backend. Normal local/LAN builds still connect to their own server.
 
 Cloudflare Pages can deploy `dist/client` using `npm ci && npm run build`. For now, multiplayer rooms are hosted by the room creator running `npm run lan` on their PC; everyone on the same LAN joins through that PC�s printed URL. Public internet multiplayer would require a separate persistent backend. See [Cloudflare and LAN hosting](docs/deployment/CLOUDFLARE-PAGES.md). A Dockerfile and PM2 configuration are included. `PORT` defaults to 2567, `CLIENT_ORIGIN` defaults to `*` (set to the client origin for production), and `MAX_ROOMS` defaults to 10.
 
 Use one process initially. Room-code lookup and room limits are process-local; multiple processes require shared room discovery/presence and admission control before scaling. Existing races are ephemeral and are lost on server restart. Drain active rooms before deploying; deploy matching client/server versions together. Keep the previous compatible deployment available for rollback. No account system, database, Redis service or paid model-generation API is needed for the single-process beta.
 
-The public frontend is deployed on Cloudflare; no public multiplayer backend has been provisioned.
+The public frontend is deployed on Cloudflare and its multiplayer backend runs on Render. Keep matching client/server branches deployed. Free Render instances may need about a minute to wake; the connection screen supports waiting and cancellation. Full servers/rooms, loading progress and reconnection have player-facing feedback. Lobby/countdown/results clients do not send flight inputs; race simulation remains 60 Hz with 20 Hz state patches.
 
 ## Third-party licenses
 

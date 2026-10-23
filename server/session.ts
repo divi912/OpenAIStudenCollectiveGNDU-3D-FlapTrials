@@ -4,6 +4,8 @@ import { COLORS, cleanName, type InputFrame } from '../shared/protocol';
 import { PlayerSchema, RaceSchema } from '../shared/schema';
 import { PRE_RACE_SECONDS } from '../shared/intro';
 
+const neutralInput = Object.freeze(idleInput());
+
 export class GameSession {
   readonly state = new RaceSchema();
   readonly ejected: string[] = [];
@@ -51,8 +53,9 @@ export class GameSession {
   step(tick: number, inputs: Map<string, InputFrame>): void {
     const s = this.state; s.tick = tick;
     if (s.phase === 'lobby' && s.isPublic) {
-      const ready = [...s.players.values()].filter(p => p.ready && p.connected);
-      if (ready.length < 2) s.deadline = 0;
+      let ready = 0;
+      for (const p of s.players.values()) if (p.ready && p.connected) ready++;
+      if (ready < 2) s.deadline = 0;
       else if (!s.deadline) s.deadline = tick + 900;
       else if (tick >= s.deadline) {
         for (const [id, p] of s.players) if (!p.ready || !p.connected) { this.ejected.push(id); this.remove(id); }
@@ -62,20 +65,26 @@ export class GameSession {
     if (s.phase === 'loading') {
       if (tick >= s.deadline) for (const [id, p] of s.players) if (!p.loaded || !p.connected) { this.ejected.push(id); this.remove(id); }
       if (s.players.size < 2) { s.phase = 'lobby'; s.deadline = 0; return; }
-      if ([...s.players.values()].every(p => p.loaded && p.connected)) {
+      let allLoaded = true;
+      for (const p of s.players.values()) if (!p.loaded || !p.connected) { allLoaded = false; break; }
+      if (allLoaded) {
         s.phase = 'countdown'; s.startTick = tick + PRE_RACE_SECONDS * 60;
       }
     }
     if (s.phase === 'countdown' && tick >= s.startTick) {
-      if ([...s.players.values()].filter(p => p.connected).length < 2) { s.phase = 'lobby'; s.deadline = 0; return; }
+      let connected = 0;
+      for (const p of s.players.values()) if (p.connected) connected++;
+      if (connected < 2) { s.phase = 'lobby'; s.deadline = 0; return; }
       s.phase = 'racing'; for (const p of s.players.values()) p.simulationTick = tick - 1;
     }
     if (s.phase !== 'racing') { for (const p of s.players.values()) p.simulationTick = tick; return; }
     const course = getCourse(s.courseId);
-    for (const [id, p] of s.players) stepRacer(p, p.connected ? inputs.get(id) ?? idleInput() : idleInput(), course, tick, s.startTick);
+    for (const [id, p] of s.players) stepRacer(p, p.connected ? inputs.get(id) ?? neutralInput : neutralInput, course, tick, s.startTick);
     if (tick - s.startTick >= Math.max(180, course.definition.estimatedClearSeconds + 90) * 60) {
       for (const p of s.players.values()) if (p.status !== 'finished') p.status = 'dnf';
     }
-    if ([...s.players.values()].every(p => p.status === 'finished' || p.status === 'dnf')) s.phase = 'results';
+    let complete = true;
+    for (const p of s.players.values()) if (p.status !== 'finished' && p.status !== 'dnf') { complete = false; break; }
+    if (complete) s.phase = 'results';
   }
 }

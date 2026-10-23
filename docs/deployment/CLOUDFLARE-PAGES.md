@@ -16,7 +16,7 @@ npm run deploy:cloudflare
 ```
 
 For a Git-connected Workers Build, select this repository and the
-`codex/model-polish` branch, set build command `npm run build:cloudflare`, and deploy
+`main` branch, set build command `npm run build:cloudflare`, and deploy
 command `npx wrangler@4.152.0 deploy --keep-vars`. The checked-in config supplies
 the Worker name, assets directory and custom domain. A local Wrangler deploy
 does not itself enable Git-triggered builds.
@@ -26,6 +26,8 @@ The public frontend connects to the Node/Colyseus backend at
 `.env.cloudflare`. This file is public configuration, not a credential.
 On Render set `CLIENT_ORIGIN=https://flaptrials.divii.xyz` exactly (no trailing
 slash or period), and use `/health` as the service health-check path.
+Set the Render service's Git branch to `main` so it runs the
+same server version as this frontend, with all integrated gameplay and mobile changes.
 Render's free service can take about a minute to wake up after inactivity;
 room creation may need to be retried after it wakes. Server restarts discard
 active rooms.
