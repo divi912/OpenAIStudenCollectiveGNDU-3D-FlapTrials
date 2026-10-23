@@ -2,6 +2,22 @@
 
 Tiny wings. Big trials. A keyboard-controlled multiplayer party flight racer in a floating bird stadium.
 
+## Current checkpoint: visual/modeling upgrade paused
+
+Development paused on **2026-10-23** at the user's request. The latest visual pass is **work in progress**, saved so it can be completed later. The previous completed gameplay/HUD/music checkpoint is commit `c494f16`.
+
+The current pass adds:
+
+- A more detailed local bird with layered back/wing feathers, feather shafts, harness stitching and an aviator badge. The local racer now uses the full model; remote racers use a smaller model.
+- Smoother 3D audience birds with eye highlights and layered wing feathers, still rendered in GPU batches with distance detail levels.
+- Continuous bevelled obstacle frames, enamel surface detail, metal trim and fittings. Frame openings are derived from the shared collision apertures.
+- Rounded seating, seat backs, brass rails, roof ribs, lanterns and structural braces; richer rocky islands, trees, foliage and smoother clouds.
+- Shared procedural enamel, stone and foliage color/normal maps, plus custom sphere/ring geometry to control mesh cost. Adaptive quality can lower audience density while keeping nearby models detailed.
+
+**Resume here:** [Modeling upgrade handoff](docs/MODELING-UPGRADE.md). It records the asset pipeline, current model budgets, changed files and remaining checks. Do not treat this checkpoint as a finished visual release.
+
+At pause: **55 unit/integration tests pass**. The latest browser run has **one failing Reduced Motion assertion** (expected `animationName: none`, received an empty string); the other eight browser tests completed without recorded failures. The new pass still needs final geometry/lighting review, hardware performance tuning, production-build verification and updated final screenshots.
+
 ## Run locally
 
 Requires Node.js **22.12+** (Node 24 recommended).

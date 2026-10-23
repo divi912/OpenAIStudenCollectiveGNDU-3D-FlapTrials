@@ -13,7 +13,7 @@ def material(name, color, roughness=.38):
     p.inputs['Base Color'].default_value = (*color, 1); p.inputs['Roughness'].default_value = roughness
     return m
 
-def ball(name, location, scale, mat, segments=24, rings=14):
+def ball(name, location, scale, mat, segments=32, rings=20):
     bpy.ops.mesh.primitive_uv_sphere_add(segments=segments, ring_count=rings, location=location)
     o=bpy.context.object; o.name=name; o.scale=scale
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
@@ -51,7 +51,7 @@ image.pixels=[v for y in range(4) for x in range(32) for v in colors[x//4]]; ima
 tex=face.node_tree.nodes.new('ShaderNodeTexImage'); tex.image=image; tex.interpolation='Closest'
 face.node_tree.links.new(tex.outputs['Color'], face.node_tree.nodes['Principled BSDF'].inputs['Base Color'])
 def detail(name, loc, size, index):
-    o=ball(name,loc,size,face,16,10)
+    o=ball(name,loc,size,face,20,12)
     for loop in o.data.uv_layers.active.data: loop.uv=((index+.5)/8,.5)
     return o
 
@@ -60,10 +60,10 @@ for i in range(5):
     o=ball('TailFan',((i-2)*.16,-.42,-.74-abs(i-2)*.03),(.115,.16,.48),body,16,10)
     o.rotation_euler[1]=(i-2)*.18; parts.append(o)
 # Layered feathers on the back read clearly from the chase camera.
-for row in range(3):
-    for col in range(4-row):
-        x=(col-(3-row)/2)*.24
-        parts.append(ball('BackFeather',(x,.35-row*.28,-.68),(.16,.22,.09),body,12,8))
+for row in range(5):
+    for col in range(5-row//2):
+        x=(col-(4-row//2)/2)*.22
+        parts.append(ball('BackFeather',(x,.57-row*.23,-.67),(.145,.235,.095),body,16,10))
 bird=join(parts,'Body'); pivot(bird,(0,0,0))
 details=[detail('Belly',(0,-.29,.56),(.63,.61,.19),0)]
 for x in [-.35,.35]:
@@ -89,13 +89,25 @@ def palette_torus(name, loc, scale, index):
     return o
 for x in [-.35,.35]: details.append(palette_torus('GoggleRim',(x,.45,.73),(.34,.395,.30),7))
 details.append(detail('GoggleBridge',(0,.47,.78),(.075,.045,.07),5))
+# Brass stitching, feather shafts and a little aviator badge add readable close detail.
+for side in [-1,1]:
+    for j in range(7):
+        details.append(detail('HarnessStitch',(side*(.48+(j-3)*.012),.35-j*.115,-.706),(.025,.012,.015),5))
+for row in range(4):
+    for col in range(4-row//2):
+        x=(col-(3-row//2)/2)*.23
+        details.append(detail('FeatherShaft',(x,.43-row*.23,-.773),(.014,.12,.013),5))
+details.append(detail('AviatorBadge',(0,-.70,-.56),(.19,.13,.04),7))
+details.append(detail('BadgeGold',(0,-.70,-.605),(.12,.06,.015),5))
 details.append(detail('BeakTop',(0,.045,.82),(.27,.15,.31),3))
 faceobj=join(details,'Details'); pivot(faceobj,(0,0,0))
 lower=detail('BeakLower',(0,-.10,.82),(.23,.085,.25),4); pivot(lower,(0,-.05,.62))
 for side, name in [(-1,'WingL'),(1,'WingR')]:
     feathers=[ball(name,(side*.88,-.06,-.02),(.28,.43,.21),body)]
+    for i in range(6):
+        feathers.append(ball('FlightFeather',(side*(.81+i*.075),-.29-i*.075,-.04+i*.035),(.10,.37-i*.028,.13),body,20,12))
     for i in range(4):
-        feathers.append(ball('FlightFeather',(side*(.83+i*.10),-.35-i*.09,-.04+i*.035),(.115,.34-i*.035,.13),body,16,10))
+        feathers.append(ball('WingCovert',(side*(.85+i*.065),-.02-i*.12,-.20),(.13,.17,.065),body,16,10))
     wing=join(feathers,name)
     wing.rotation_euler[2]=side*.27
     bpy.context.view_layer.objects.active=wing; bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
@@ -104,13 +116,13 @@ export('bird')
 for obj in list(bpy.context.scene.objects):
     if obj.type != 'MESH': continue
     bpy.context.view_layer.objects.active=obj
-    modifier=obj.modifiers.new('FlightDistanceLOD','DECIMATE'); modifier.ratio=.32; modifier.use_collapse_triangulate=True
+    modifier=obj.modifiers.new('FlightDistanceLOD','DECIMATE'); modifier.ratio=.24; modifier.use_collapse_triangulate=True
     bpy.ops.object.modifier_apply(modifier=modifier.name)
 export('bird-lod', converted=True)
 
 reset()
 green=material('PipeGreen',(.14,.57,.29)); rim=material('PipeRim',(.34,.78,.43)); metal=material('WarmMetal',(.92,.75,.40)); purple=material('GearLilac',(.58,.42,.72))
-def tube(name, inner, outer, length, mat, axis='Z', segments=20):
+def tube(name, inner, outer, length, mat, axis='Z', segments=48):
     verts=[]; faces=[]
     for z,r in [(-length/2,outer),(length/2,outer),(-length/2,inner),(length/2,inner)]:
         for i in range(segments):
@@ -133,5 +145,12 @@ for i in range(12):
     bpy.ops.mesh.primitive_cube_add(size=1,location=(math.cos(a)*1.22,math.sin(a)*1.22,0))
     o=bpy.context.object; o.scale=(.35,.28,.28); o.rotation_euler[2]=a; o.data.materials.append(purple); teeth.append(o)
 join(teeth,'Gear')
+# A rounded unit panel is instanced for seating, trim and mechanical housings.
+bpy.ops.mesh.primitive_cube_add(size=1)
+panel=bpy.context.object; panel.name='RoundedPanel'; panel.data.materials.append(metal)
+bevel=panel.modifiers.new('SoftMachinedEdges','BEVEL'); bevel.width=.06; bevel.segments=3
+bpy.context.view_layer.objects.active=panel; bpy.ops.object.modifier_apply(modifier=bevel.name)
+normal=panel.modifiers.new('WeightedNormals','WEIGHTED_NORMAL'); normal.keep_sharp=True
+bpy.ops.object.modifier_apply(modifier=normal.name)
 export('obstacle-kit')
 print('Bird and modular props exported successfully')

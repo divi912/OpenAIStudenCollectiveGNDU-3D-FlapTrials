@@ -46,13 +46,13 @@ export class Audience {
     };
     this.batches.push({ near: make(this.near, 'near'), far: make(this.far, 'far'), z, detailed: false });
   }
-  update(progress: number, low: boolean) {
+  update(progress: number, low: boolean, sparse = false) {
     for (const b of this.batches) {
       const distance = Math.abs(progress - b.z);
       // Hysteresis avoids flicker at the LOD boundary. Distant stands fade into course fog.
       b.detailed = !low && distance < (b.detailed ? 110 : 90);
       const visible = distance < (low ? 205 : 310);
-      const count = b.detailed ? 104 : 52;
+      const count = b.detailed && !sparse ? 104 : 52;
       b.near.thinInstanceCount = count; b.far.thinInstanceCount = count;
       b.near.setEnabled(visible && b.detailed); b.far.setEnabled(visible && !b.detailed);
     }

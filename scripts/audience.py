@@ -18,22 +18,18 @@ def build(name, low):
         for c in attr.data: c.color = (*rgb, 1)
         for p in obj.data.polygons: p.use_smooth = True
         parts.append(obj); return obj
-    def egg(loc, scale, rgb, segments=8, rings=4):
+    def egg(loc, scale, rgb, segments=12, rings=8):
         bpy.ops.mesh.primitive_uv_sphere_add(segments=segments, ring_count=rings, location=loc)
         obj = bpy.context.object; obj.scale = scale
         return paint(obj, rgb)
     def diamond(loc, scale, rgb):
-        if low:
-            mesh=bpy.data.meshes.new('Octahedron')
-            mesh.from_pydata([(0,1,0),(1,0,0),(0,0,1),(-1,0,0),(0,0,-1),(0,-1,0)],[],[(0,2,1),(0,3,2),(0,4,3),(0,1,4),(5,1,2),(5,2,3),(5,3,4),(5,4,1)])
-            obj=bpy.data.objects.new('BirdDetail',mesh); bpy.context.collection.objects.link(obj)
-            bpy.context.view_layer.objects.active=obj; obj.location=loc
-        else: bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=1, location=loc)
+        if low: bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=1, location=loc)
+        else: bpy.ops.mesh.primitive_uv_sphere_add(segments=10, ring_count=6, radius=1, location=loc)
         obj=bpy.context.object; obj.scale=scale
         return paint(obj,rgb)
     # +Y up / +Z toward the race. Distinct belly, folded wings, eye whites and a beak.
-    egg((0,.52,0),(.46,.57,.35),(1,.90,.64), 6 if low else 8, 3 if low else 4)
-    if not low: egg((0,.42,.25),(.30,.34,.12),(1,.97,.84),6,3)
+    egg((0,.52,0),(.46,.57,.35),(1,.90,.64), 10 if low else 20, 6 if low else 12)
+    egg((0,.42,.25),(.30,.34,.12),(1,.97,.84),8 if low else 12,4 if low else 8)
     for side in [-1,1]:
         wing=diamond((side*.40,.47,-.04),(.13,.33,.27),(.54,.71,.61))
         wing.rotation_euler[0]=side*.14
@@ -41,8 +37,12 @@ def build(name, low):
         diamond((side*.16,.76,.31),(.145,.17,.09),(1,1,.96))
         diamond((side*.16,.77,.39),(.064,.083,.035),(.025,.045,.05))
         if not low: diamond((side*.19,.025,.13),(.13,.055,.18),(.96,.43,.10))
+        if not low:
+            egg((side*.145,.80,.42),(.025,.03,.014),(1,1,1),8,4)
+            for j in range(3):
+                egg((side*(.43+j*.025),.50-j*.12,-.13),(.07,.16,.09),(.47,.64,.53),8,4)
     # Four-sided beak, splayed tail and crest are actual solid geometry.
-    bpy.ops.mesh.primitive_cone_add(vertices=4, radius1=.13, radius2=0, depth=.30, location=(0,.56,.44), rotation=(math.pi/2,0,0))
+    bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=.13, radius2=0, depth=.30, location=(0,.56,.44), rotation=(math.pi/2,0,0))
     paint(bpy.context.object,(1,.42,.075))
     diamond((0,.20,-.38),(.28,.10,.29),(.54,.71,.61))
     diamond((.02,1.09,-.06),(.09,.18,.075),(1,.73,.38))

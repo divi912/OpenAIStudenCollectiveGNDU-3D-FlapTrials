@@ -14,7 +14,6 @@ import type { InstancedMesh } from '@babylonjs/core/Meshes/instancedMesh.js';
 import { CreateBox } from '@babylonjs/core/Meshes/Builders/boxBuilder.js';
 import { CreateSphere } from '@babylonjs/core/Meshes/Builders/sphereBuilder.js';
 import { CreateCylinder } from '@babylonjs/core/Meshes/Builders/cylinderBuilder.js';
-import { CreateTorus } from '@babylonjs/core/Meshes/Builders/torusBuilder.js';
 import { CreatePolyhedron } from '@babylonjs/core/Meshes/Builders/polyhedronBuilder.js';
 import { CreatePlane } from '@babylonjs/core/Meshes/Builders/planeBuilder.js';
 import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture.js';
@@ -31,6 +30,10 @@ import type { Box, CourseDefinition, ObstacleDefinition, PlayerSnapshot, RacerSt
 import type { Preferences } from '../storage';
 import { presentFrame } from './frame';
 import { Audience } from './audience';
+import { gateShell } from './gate-shell';
+import { ringData } from './ring';
+import { sphereData } from './sphere';
+import { surfaceMap, type Finish } from './surfaces';
 import { garden, sceneryChunk, THEMES } from './scenery';
 import { partyEvent } from '../../shared/party';
 import { frameAt, trackToWorld, bodyRoll } from '../../shared/track';
@@ -52,6 +55,7 @@ export class GameScene {
   private kitAsset?: AssetContainer;
   private prototype = new Map<string, Mesh>();
   private materials = new Map<string, StandardMaterial>();
+  private surfaces = new Map<Finish, ReturnType<typeof surfaceMap>>();
   private menuRoot: TransformNode;
   private courseRoot?: TransformNode;
   private menuBirds: BirdVisual[] = [];
@@ -104,12 +108,12 @@ export class GameScene {
     this.camera = new FreeCamera('camera', new Vector3(15, 11, 22), scene);
     this.camera.minZ = .15; this.camera.maxZ = 600; this.camera.fov = .68;
     this.camera.setTarget(new Vector3(0, 1, 0));
-    const sky = new HemisphericLight('soft-sky', new Vector3(0, 1, 0), scene); sky.intensity = .85; sky.groundColor = c3('#6e899a');
+    const sky = new HemisphericLight('soft-sky', new Vector3(0, 1, 0), scene); sky.intensity = .72; sky.groundColor = c3('#647487');
     const sun = new DirectionalLight('sun', new Vector3(-.5, -.8, .6), scene); sun.intensity = 1.35; sun.diffuse = c3('#fff0cf');
     scene.imageProcessingConfiguration.toneMappingEnabled = true;
     scene.imageProcessingConfiguration.toneMappingType = 1;
     scene.imageProcessingConfiguration.exposure = 1.1;
-    scene.imageProcessingConfiguration.contrast = 1.05;
+    scene.imageProcessingConfiguration.contrast = 1.12;
     this.menuRoot = new TransformNode('menu-world', scene);
     this.skyTexture = new DynamicTexture('painted-sky', { width: 4, height: 256 }, scene, false);
     this.skyTexture.wrapU = this.skyTexture.wrapV = Texture.CLAMP_ADDRESSMODE;
@@ -140,8 +144,8 @@ export class GameScene {
     }
     this.ready = true;
   }
-  private mat(color: string, shiny = true): StandardMaterial {
-    const key = `${color}-${shiny}`;
+  private mat(color: string, shiny = true, finish?: Finish): StandardMaterial {
+    const key = `${color}-${shiny}-${finish ?? 'plain'}`;
     let mat = this.materials.get(key);
     if (!mat) {
       mat = new StandardMaterial(key, this.scene); mat.diffuseColor = c3(color);
@@ -149,6 +153,11 @@ export class GameScene {
       mat.specularColor = shiny ? new Color3(.45, .45, .4) : Color3.Black(); mat.specularPower = shiny ? 48 : 8;
       if (['#ffcf6d', '#8ce4ed', '#fff1cc', '#e0f7e8'].includes(color)) mat.emissiveColor = c3(color).scale(.65);
       if (key.startsWith('#fff') && !shiny) mat.emissiveColor = c3(color).scale(.18);
+      if (finish) {
+        let maps = this.surfaces.get(finish);
+        if (!maps) { maps = surfaceMap(this.scene, finish); this.surfaces.set(finish, maps); }
+        mat.diffuseTexture = maps.diffuse; mat.bumpTexture = maps.normal;
+      }
       this.materials.set(key, mat);
     }
     return mat;
@@ -156,8 +165,9 @@ export class GameScene {
   private source(kind: string, color: string): Mesh {
     const key = `${kind}:${color}`; let mesh = this.prototype.get(key);
     if (!mesh) {
-      if (kind === 'cloud' || kind === 'leaf' || kind === 'bubble' || kind === 'sun') mesh = CreateSphere(key, { diameter: 1, segments: kind === 'bubble' ? 14 : kind === 'sun' ? 12 : kind === 'leaf' ? 4 : 6 }, this.scene);
-      else if (kind === 'rock') mesh = CreateSphere(key, { diameter: 1, segments: 4 }, this.scene);
+      if (kind === 'cloud' || kind === 'leaf') { mesh = new Mesh(key, this.scene); sphereData(kind === 'cloud' ? 32 : 16, kind === 'cloud' ? 16 : 8).applyToMesh(mesh); }
+      else if (kind === 'bubble' || kind === 'sun') mesh = CreateSphere(key, { diameter: 1, segments: 24 }, this.scene);
+      else if (kind === 'rock') mesh = CreateSphere(key, { diameter: 1, segments: 8 }, this.scene);
       else if (kind === 'banner') mesh = CreatePlane(key, { size: 1 }, this.scene);
       else if (kind === 'gem') mesh = CreatePolyhedron(key, { type: 1, size: 1 }, this.scene);
       else if (kind === 'star') {
@@ -166,10 +176,11 @@ export class GameScene {
         for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5, r = i % 2 ? .43 : 1; data.positions.push(Math.sin(a) * r, Math.cos(a) * r, 0); data.normals.push(0, 0, -1); data.indices.push(0, i + 1, (i + 1) % 10 + 1); }
         data.applyToMesh(mesh); this.mat(color, false).backFaceCulling = false;
       }
-      else if (kind === 'hoop') { mesh = CreateTorus(key, { diameter: 2, thickness: .09, tessellation: 32 }, this.scene); mesh.bakeTransformIntoVertices(Matrix.RotationX(Math.PI / 2)); }
-      else if (kind === 'island') mesh = CreateCylinder(key, { height: 1, diameterTop: 2, diameterBottom: 1.1, tessellation: 24 }, this.scene);
+      else if (kind === 'hoop') { mesh = new Mesh(key, this.scene); ringData().applyToMesh(mesh); }
+      else if (kind === 'island') mesh = CreateCylinder(key, { height: 1, diameterTop: 2, diameterBottom: 1.1, tessellation: 48 }, this.scene);
       else if (kind === 'cone' || kind === 'peak' || kind === 'grass') mesh = CreateCylinder(key, { height: 1, diameterTop: kind === 'cone' ? .3 : 0, diameterBottom: 1, tessellation: kind === 'peak' ? 9 : 8 }, this.scene);
-      else if (kind === 'rod') mesh = CreateCylinder(key, { height: 1, diameter: 1, tessellation: 8 }, this.scene);
+      else if (kind === 'rod') mesh = CreateCylinder(key, { height: 1, diameter: 1, tessellation: 20 }, this.scene);
+      else if (kind === 'panel') { mesh = (this.kitAsset!.meshes.find(m => m.name === 'RoundedPanel') as Mesh).clone(key, null, true)!; mesh.parent = null; mesh.position.setAll(0); mesh.rotationQuaternion = null; mesh.scaling.setAll(1); }
       else if (kind === 'gear') { mesh = (this.kitAsset!.meshes.find(m => m.name === 'Gear') as Mesh).clone(key, null, true)!; mesh.parent = null; mesh.position.setAll(0); mesh.rotationQuaternion = null; }
       else if (kind === 'pipe') {
         const template = this.kitAsset?.meshes.find(m => m.name === 'PipeStraight') as Mesh | undefined;
@@ -180,7 +191,7 @@ export class GameScene {
         } else mesh = CreateCylinder(key, { height: 1, diameter: 1, tessellation: 16 }, this.scene);
       }
       else mesh = CreateBox(key, { size: 1 }, this.scene);
-      mesh.material = this.mat(color, ['pipe', 'gem', 'gear', 'hoop'].includes(kind)); mesh.isVisible = false; mesh.isPickable = false;
+      mesh.material = this.mat(color, ['pipe', 'gem', 'gear', 'hoop', 'panel'].includes(kind), ['pipe', 'panel', 'gear'].includes(kind) ? 'enamel' : ['island', 'rock'].includes(kind) ? 'stone' : kind === 'leaf' ? 'foliage' : undefined); mesh.isVisible = false; mesh.isPickable = false;
       if (kind === 'banner') mesh.material = this.stadiumMaterial(kind);
       if (kind === 'sun') { const sun = new StandardMaterial('sun-disc', this.scene); sun.disableLighting = true; sun.emissiveColor = c3('#ffe5a7'); mesh.material = sun; }
       if (kind === 'bubble') {
@@ -206,16 +217,27 @@ export class GameScene {
     mesh.parent = parent; mesh.position.set(position[0], position[1], position[2]); mesh.scaling.set(scale[0], scale[1], scale[2]); mesh.isPickable = false;
     return mesh;
   }
-  private bird(id: string, color: string, parent?: TransformNode): BirdVisual {
+  private gateFrame(o: ObstacleDefinition, color: string, parent: TransformNode) {
+    const key = `frame:${o.shape}:${o.width}:${o.height}:${o.thickness}:${o.kind === 'wall'}:${color}`;
+    let source = this.prototype.get(key);
+    if (!source) {
+      source = new Mesh(key, this.scene);
+      gateShell(apertureVertices(o), o.kind === 'wall' ? .9 : .55, o.thickness).applyToMesh(source);
+      source.material = this.mat(color, true, 'enamel'); source.isVisible = false; source.isPickable = false;
+      this.prototype.set(key, source);
+    }
+    const frame = source.createInstance('bevelled-gate-frame'); frame.parent = parent; frame.isPickable = false;
+  }
+  private bird(id: string, color: string, parent?: TransformNode, detailed = false): BirdVisual {
     const root = new TransformNode(`bird-${id}`, this.scene); root.parent = parent ?? null;
-    const model = (id === 'hero' ? this.birdAsset! : this.birdLod!).instantiateModelsToScene(name => `${id}-${name}`, false, { doNotInstantiate: true });
+    const model = (id === 'hero' || detailed ? this.birdAsset! : this.birdLod!).instantiateModelsToScene(name => `${id}-${name}`, false, { doNotInstantiate: true });
     for (const node of model.rootNodes) node.parent = root;
     const meshes = root.getChildMeshes();
     let material: PBRMaterial | undefined;
     for (const mesh of meshes) {
       mesh.isPickable = false;
       if (mesh.material?.name === 'Body' || mesh.material?.name.endsWith('-Body')) {
-        material ??= (mesh.material as PBRMaterial).clone(`body-${id}`)!; material.albedoColor = c3(color).toLinearSpace(); material.roughness = .35; material.emissiveColor = material.albedoColor.scale(.06);
+        material ??= (mesh.material as PBRMaterial).clone(`body-${id}`)!; material.albedoColor = c3(color).toLinearSpace(); material.roughness = .48; material.emissiveColor = material.albedoColor.scale(.04);
         mesh.material = material;
       }
     }
@@ -310,16 +332,17 @@ export class GameScene {
         }
       } else {
         const color = o.kind === 'twist_gate' ? '#df9a83' : o.kind === 'rotating_gate' ? '#a28abd' : o.kind === 'shutter' ? '#d6a465' : THEMES[course.difficultyIndex].leaf;
+        this.gateFrame(o, color, group);
         const local = { ...o, kind: o.kind === 'wall' ? 'wall' as const : 'ring' as const, x: 0, y: 0, z: 0, tilt: 0 };
         for (const box of obstacleBoxes(local, 0)) {
-          const beam = this.instance('pipe', color, group, box.center, [box.half[1] * 2, box.half[0] * 2, box.half[2] * 2]); beam.rotation.z = box.angle! - Math.PI / 2;
-          const trim = this.instance('rod', '#ffcf6d', group, [box.center[0], box.center[1], -o.thickness / 2 - .02], [.07, box.half[0] * 2, .07]); trim.rotation.z = beam.rotation.z;
+          const trim = this.instance('rod', '#ffcf6d', group, [box.center[0], box.center[1], -o.thickness / 2 - .02], [.065, box.half[0] * 2, .065]); trim.rotation.z = box.angle! - Math.PI / 2;
         }
         const points = apertureVertices(o);
         for (let i = 0; i < points.length; i += points.length > 8 ? 8 : 1) {
           const [x, y] = points[i];
           this.instance('leaf', '#f7dfaa', group, [x * 1.06, y * 1.06, -.1], [.25, .25, o.thickness + .16]);
           this.instance('leaf', '#696f69', group, [x * 1.06, y * 1.06, -o.thickness / 2 - .13], [.10, .10, .07]);
+          const badge = this.instance('panel', '#fff1cc', group, [x * 1.08, y * 1.08, -o.thickness / 2 - .06], [.22, .12, .07]); badge.rotation.z = Math.atan2(y, x);
         }
         if (o.kind === 'rotating_gate') {
           for (const side of [-1, 1]) {
@@ -383,7 +406,7 @@ export class GameScene {
         temp.set(...trackToWorld(this.course!, local.x * .6, cameraY + .45, local.z + 22));
         Vector3.LerpToRef(this.look, temp, snap ? 1 : 1 - Math.exp(-dt * 9), this.look);
         this.camera.position.copyFrom(this.follow); this.camera.setTarget(this.look);
-        this.audience?.update(local.z, this.settings.quality === 'low' || (this.settings.quality === 'auto' && this.resolution > 1.15));
+        this.audience?.update(local.z, this.settings.quality === 'low', this.settings.quality === 'auto' && this.resolution > 1.15);
         for (const chunk of this.chunks) chunk.root.setEnabled(chunk.z > local.z - 200 && chunk.z < local.z + 330);
         const boosted = local.simulationTick < local.boostUntilTick || local.speed > 23;
         const targetFov = (boosted && !this.settings.reducedMotion ? 81 : 75) * Math.PI / 180;
@@ -405,7 +428,7 @@ export class GameScene {
       const seen = new Set<string>();
       for (const p of players) {
         seen.add(p.playerId); let bird = this.birds.get(p.playerId);
-        if (!bird) { bird = this.bird(p.playerId, p.color); bird.root.scaling.setAll(.43); this.birds.set(p.playerId, bird); }
+        if (!bird) { bird = this.bird(p.playerId, p.color, undefined, p.playerId === localId); bird.root.scaling.setAll(.43); this.birds.set(p.playerId, bird); }
         bird.root.setEnabled(p.status !== 'dnf' && p.status !== 'crashed'); bird.root.position.set(...trackToWorld(this.course!, p.x, p.y, p.z));
         this.animateBird(bird, seconds, .25 + Math.max(0, p.vy) * .035, -p.vx * .055, -p.vy * .025);
         const f = frameAt(this.course!, p.z);

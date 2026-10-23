@@ -21,8 +21,14 @@ export function grandstand(place: Place, parent: TransformNode, side: number, z:
   place('island', '#c5d4c9', stand, [0, .5, -4], [44, .4, 9]);
   for (let row = 0; row < 5; row++) {
     const y = row * 1.25 + 1, depth = -row * 2.1;
-    place('box', ['#7ab6bb', '#e2bd8c', '#9cb9cf', '#d7a6ad', '#aebf9c'][row], stand, [0, y - .4, depth], [78 - row * 1.2, .6, 2.3]);
+    const seatColor = ['#7ab6bb', '#e2bd8c', '#9cb9cf', '#d7a6ad', '#aebf9c'][row];
+    place('panel', seatColor, stand, [0, y - .4, depth], [78 - row * 1.2, .6, 2.3]);
     place('box', theme.accent, stand, [0, y - .08, depth + 1.15], [78 - row * 1.2, .10, .10]);
+    for (let seat = 0; seat < 13; seat++) {
+      const x = (seat - 6) * 5.66;
+      place('panel', seatColor, stand, [x, y + .4, depth - .60], [4.8, .85, .22]);
+      place('rod', '#e8dfc8', stand, [x + 2.5, y + .18, depth], [.10, .6, .10]);
+    }
   }
   place('banner', '#ffffff', stand, [0, -.1, 1.32], [77, 1.15, 1]);
   for (const x of [-37, 37]) {
@@ -33,6 +39,22 @@ export function grandstand(place: Place, parent: TransformNode, side: number, z:
   // Rounded canopy and luminous fascia give the stands an airborne arena silhouette.
   place('island', '#e8dfc8', stand, [0, 9.1, -9.7], [44, .45, 5.6]);
   place('island', theme.accent, stand, [0, 9.4, -9.7], [44.2, .18, 5.8]);
+  // Roof ribs, hanging lanterns and a brass safety rail give each terrace depth.
+  for (const x of [-32, -16, 0, 16, 32]) {
+    place('panel', '#677d77', stand, [x, 8.7, -9], [.22, .5, 8]);
+    place('rod', '#536d66', stand, [x, 7.9, -6], [.09, 1.2, .09]);
+    place('leaf', '#fff1cc', stand, [x, 7.3, -6], [.7, .7, .7]);
+    place('hoop', '#d6b371', stand, [x, 7.3, -6], [.43, .43, .43]);
+  }
+  const rail = place('rod', '#d6b371', stand, [0, 1.1, 1.55], [.12, 77, .12]); rail.rotation.z = Math.PI / 2;
+  for (let i = -6; i <= 6; i++) {
+    place('rod', '#d6b371', stand, [i * 6, .5, 1.55], [.11, 1.2, .11]);
+    place('leaf', '#fff1cc', stand, [i * 6, 1.15, 1.55], [.22, .22, .22]);
+  }
+  for (const x of [-26, 0, 26]) {
+    const brace = place('panel', '#516b68', stand, [x, -1.2, -3.8], [.5, 3.4, 7]); brace.rotation.z = x < 0 ? -.3 : .3;
+    place('panel', theme.accent, stand, [x, -.3, 1.4], [7, .18, .18]);
+  }
   for (const x of [-38, 0, 38]) place('leaf', '#ffcf6d', stand, [x, 8.6, -6], [.7, .3, .4]);
   for (const x of [-29, 29]) {
     const thruster = place('hoop', '#8ce4ed', stand, [x, -2.5, -4], [2.3, 2.3, 1]); thruster.rotation.x = Math.PI / 2;
@@ -55,6 +77,10 @@ export function garden(place: Place, parent: TransformNode, x: number, y: number
       const treeY = y + .4;
       place('rod', '#806b56', parent, [px, treeY + 1.1, pz], [.24, 2.3, .24]);
       for (let j = 0; j < 3; j++) place('leaf', j === 1 ? theme.grass : theme.leaf, parent, [px + Math.sin(j * 3) * .65, treeY + 2.3 + j * .55, pz + Math.cos(j * 3) * .45], [1.8 - j * .22, 1.6 - j * .2, 1.7 - j * .2]);
+      for (let j = 0; j < 5; j++) {
+        const a = j * 2.399;
+        place('leaf', j % 2 ? theme.rim : theme.grass, parent, [px + Math.sin(a) * .85, treeY + 2.8 + Math.cos(a) * .4, pz + Math.cos(a) * .75], [.75, .9, .8]);
+      }
     }
   }
   for (let i = 0; i < 14; i++) {
@@ -72,6 +98,12 @@ export function garden(place: Place, parent: TransformNode, x: number, y: number
     const a = i * 1.7, px = x + Math.cos(a) * size, pz = z + Math.sin(a) * size * .86;
     place('rod', theme.leaf, parent, [px, y - 1.1, pz], [.13, 2 + noise(i + seed) * 1.8, .13]);
     place('leaf', theme.grass, parent, [px, y - .4, pz], [.65, .7, .55]);
+  }
+  // A broken stone skirt with moss clumps replaces the clean cylindrical island edge.
+  for (let i = 0; i < 12; i++) {
+    const a = i * Math.PI / 6;
+    const rock = place('rock', i % 2 ? theme.stone : theme.dark, parent, [x + Math.cos(a) * size * .8, y - size * .23, z + Math.sin(a) * size * .72], [size * .42, size * .38, size * .36]);
+    rock.rotation.y = a;
   }
 }
 
