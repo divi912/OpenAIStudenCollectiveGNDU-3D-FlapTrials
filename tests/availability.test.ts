@@ -3,6 +3,12 @@ import { connectionError, waitForServer } from '../client/network/availability';
 
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
+it('reports a missing backend endpoint immediately instead of retrying a static site for 75 seconds', async () => {
+  const fetcher = vi.fn().mockResolvedValue(new Response('', { status: 404 })); vi.stubGlobal('fetch', fetcher);
+  await expect(waitForServer('https://static.test', new AbortController().signal)).rejects.toThrow('not configured');
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+
 it('retries a waking server and returns real health, not an HTML landing page', async () => {
   vi.useFakeTimers();
   const health = { status: 'ok', rooms: 0, players: 0 };

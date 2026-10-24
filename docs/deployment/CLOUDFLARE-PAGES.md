@@ -24,17 +24,30 @@ does not itself enable Git-triggered builds.
 The public frontend connects to the Node/Colyseus backend at
 `https://openaistudencollectivegndu-3d-flaptrials.onrender.com`, configured in
 `.env.cloudflare`. This file is public configuration, not a credential.
+Both `npm run build` and `npm run build:cloudflare` now embed the public origin
+and backend mapping from that file. When opened on `VITE_CLIENT_ORIGIN`, either
+build connects to Render; local/LAN and preview hosts continue using their own
+server. An explicit `VITE_SERVER_URL` always overrides this selection. If you
+change the public domain or backend, update both entries in `.env.cloudflare`
+and rebuild the frontend.
+
+This prevents a Git-connected Worker built with the ordinary build command from
+requesting `/health` on the static Cloudflare host. That endpoint returns 404
+there because Workers Static Assets does not run the multiplayer server. A
+missing backend endpoint now produces an immediate setup error instead of a
+75-second cold-start retry. Actual temporary Render failures are still retried.
+
 On Render set `CLIENT_ORIGIN=https://flaptrials.divii.xyz` exactly (no trailing
 slash or period), and use `/health` as the service health-check path.
 Set the Render service's Git branch to `main` so it runs the
 same server version as this frontend, with all integrated gameplay and mobile changes.
 Render's free service can take about a minute to wake up after inactivity;
-room creation may need to be retried after it wakes. Server restarts discard
+the connection screen waits and retries while it wakes. Server restarts discard
 active rooms.
 
 Workers Static Assets serves only the frontend; Render runs multiplayer.
-Ordinary `npm run build` and `npm run lan` do not use `.env.cloudflare` and
-continue connecting to the local server. LAN play remains available below.
+Ordinary `npm run build` and `npm run lan` continue connecting to the local
+server when opened on a local/LAN host. LAN play remains available below.
 
 ## Optional LAN play: one player hosts on their PC
 

@@ -1,5 +1,7 @@
 import type { ServerHealth } from '../../shared/server-health';
 
+class BackendConfigurationError extends Error {}
+
 export function connectionError(cause: unknown): string {
   const text = cause instanceof Error ? cause.message : String(cause ?? '');
   if (/server full|all rooms|all nests/i.test(text)) return 'Server full: all rooms are busy. Join a friend’s room or try again after a race ends.';
@@ -15,13 +17,14 @@ export async function waitForServer(url: string, signal: AbortSignal): Promise<S
   while (!combined.aborted) {
     try {
       const response = await fetch(`${url}/health`, { cache: 'no-store', signal: AbortSignal.any([combined, AbortSignal.timeout(8000)]) });
+      if (response.status === 404 || response.status === 405) throw new BackendConfigurationError('Multiplayer is not configured correctly on this website. Please contact the host; solo practice still works.');
       if (response.status === 429) throw new Error('429: too many requests');
       if (response.ok) {
         const health = await response.json() as ServerHealth;
         if (health.status === 'ok') return health;
       }
     } catch (cause) {
-      if (cause instanceof Error && cause.message.startsWith('429:')) throw cause;
+      if (cause instanceof BackendConfigurationError || (cause instanceof Error && cause.message.startsWith('429:'))) throw cause;
       if (combined.aborted) break;
     }
     await new Promise<void>(resolve => {

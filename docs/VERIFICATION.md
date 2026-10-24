@@ -13,6 +13,13 @@
 
 # Local verification — 2026-10-22
 
+## Render connection repair — 2026-10-24
+
+- Pulled the integrated `main` checkpoint `f462def`, including touch controls, camera/intro changes and server feedback. The live Cloudflare bundle contained `SERVER_URL = location.origin` and no Render URL. Browser room creation retried the static host's `/health` (404), so it never reached matchmaking. Render's health, room creation and WebSockets worked when reached directly.
+- Both frontend build modes now embed a public origin/backend mapping from `.env.cloudflare`. The configured public website connects to Render even after an ordinary `npm run build`; explicit endpoint overrides still win, while development, LAN, IPv6 localhost and combined production hosts retain their local routes. Missing backend endpoints fail with a clear configuration message; genuine cold starts still retry and can be cancelled.
+- **76 unit/integration tests**, type checking and the production build pass. **Four focused browser tests** pass: serving the actual ordinary production build under the public origin to verify its Render requests, a two-browser authoritative race, capacity feedback and cold-start cancellation. A temporary browser-only endpoint override also allowed two clients on the existing live site to create/join a Render room and reach `racing` with the same start tick, confirming the fault was endpoint selection.
+- This focused repair does not claim the unrelated full visual/mobile browser suite is green: the incoming GitHub CI run already recorded failures in party-event, viewport/input, mobile and audience checks. Live deployment verification is recorded separately after rollout.
+
 ## Server feedback and hosted multiplayer — 2026-10-23
 
 - 70 unit/integration tests pass, including capacity admission, canonical configured origins, cold-start retry/cancellation, and existing authority/reconnection tests. Four focused browser tests pass: delayed-model multiplayer startup, closed-connection leave, full-server feedback and cold-start cancellation.

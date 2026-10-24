@@ -6,10 +6,11 @@ import { stepRacer } from '../../shared/physics';
 import type { Data } from '@colyseus/schema';
 import { waitForServer } from './availability';
 import { canRequestRoom } from '../../shared/server-health';
+import { serverEndpoint } from './endpoint';
 
 export interface ConnectionProgress { kind: 'connecting' | 'reconnecting'; title: string; detail: string }
 
-export const SERVER_URL = (import.meta.env.VITE_SERVER_URL as string | undefined) ?? (import.meta.env.DEV ? `${location.protocol}//${location.hostname}:2567` : location.origin);
+export const SERVER_URL = serverEndpoint(location.origin, import.meta.env.DEV, import.meta.env.VITE_SERVER_URL, __FLAP_HOSTED_BACKEND__);
 export class Connection {
   private client = new Client(SERVER_URL);
   room?: Room<any, RaceSchema>;
