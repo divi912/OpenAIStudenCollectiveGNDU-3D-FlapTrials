@@ -8,6 +8,7 @@ export class WindowLimiter {
   private entries = new Map<string, { count: number; until: number }>();
   private nextSweep = 0;
   constructor(private maxKeys = 10000) {}
+  forget(key: string) { this.entries.delete(key); }
   take(key: string, limit: number, windowMs = 60000, now = Date.now()) {
     if (now >= this.nextSweep) {
       for (const [id, entry] of this.entries) if (entry.until <= now) this.entries.delete(id);

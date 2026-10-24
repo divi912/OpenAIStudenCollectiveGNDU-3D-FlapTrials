@@ -29,6 +29,7 @@ This is a small public-beta baseline, not a guarantee against distributed attack
 | Matchmaking JSON body | 8 KB, including streamed/chunked bodies |
 | Client WebSocket frame | 4 KB; compression disabled |
 | Client messages | 180 per second; normal flight is about 60 |
+| Lobby/control actions | 10 per second, allowing short Ready/Start bursts |
 | Inactive lobby expiry | 10 minutes |
 | Authoritative room / racer cap | `MAX_ROOMS` (default 10) × 8 racers |
 

@@ -28,9 +28,11 @@ it('reopens admission and matchmaking metadata after a results-to-lobby rematch'
   for (const room of [host, guest]) {
     room.onMessage('notice', () => {});
     room.onStateChange(s => { if (s.phase === 'loading') room.send('action', { type: 'loaded', hash: s.courseHash, raceId: s.raceId }); });
-    room.send('action', { type: 'ready', value: true });
   }
-  await until(() => [...host.state.players.values()].every(p => p.ready));
+  guest.send('action', { type: 'ready', value: true });
+  await until(() => host.state.players.get(guest.sessionId)?.ready === true);
+  // A legitimate Ready/Start burst must not silently drop the second action.
+  host.send('action', { type: 'ready', value: true });
   host.send('action', { type: 'start' });
   await until(() => host.state.phase === 'racing');
   const actual = liveRooms.get(host.state.code)!;

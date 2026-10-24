@@ -5,7 +5,7 @@ import { PHYSICS_VERSION, PROTOCOL_VERSION, type InputFrame } from '../../shared
 import { GameSession } from '../session';
 import { COURSES } from '../../shared/courses';
 import { roomLimit } from '../config';
-import { validAction, MESSAGE_LIMIT } from '../security';
+import { validAction, MESSAGE_LIMIT, WindowLimiter } from '../security';
 
 export const liveRooms = new Map<string, RaceRoom>();
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -21,7 +21,7 @@ export class RaceRoom extends Room<{ state: RaceSchema; input: FlightInput }> {
     idle: true,
   });
   private commands = new Map<string, InputFrame>();
-  private messageTimes = new Map<string, number>();
+  private actionBudget = new WindowLimiter(128);
   private tickTimes: number[] = [];
   private tickCursor = 0;
   private publishedPhase = 'lobby';
@@ -50,9 +50,8 @@ export class RaceRoom extends Room<{ state: RaceSchema; input: FlightInput }> {
       }
     }, 30000);
     this.onMessage('action', (client, action: unknown) => {
-      const now = Date.now(), last = this.messageTimes.get(client.sessionId) ?? 0;
-      if (now - last < 40 || !validAction(action, this.state.raceId)) return;
-      this.messageTimes.set(client.sessionId, now);
+      const now = Date.now();
+      if (!validAction(action, this.state.raceId) || !this.actionBudget.take(client.sessionId, 10, 1000, now).allowed) return;
       this.lastActivity = now;
       switch (action.type) {
         case 'ready': this.model.ready(client.sessionId, action.value === true); break;
@@ -90,7 +89,7 @@ export class RaceRoom extends Room<{ state: RaceSchema; input: FlightInput }> {
   }
   onLeave(client: Client): void {
     const p = this.state.players.get(client.sessionId); if (!p) return;
-    this.messageTimes.delete(client.sessionId);
+    this.actionBudget.forget(client.sessionId);
     if (this.state.phase !== 'racing') this.model.remove(client.sessionId);
     else {
       p.connected = false; if (p.status !== 'finished') p.status = 'dnf';
