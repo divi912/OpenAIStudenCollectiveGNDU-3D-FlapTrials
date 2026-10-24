@@ -5,6 +5,7 @@ import { PHYSICS_VERSION, PROTOCOL_VERSION, type InputFrame } from '../../shared
 import { GameSession } from '../session';
 import { COURSES } from '../../shared/courses';
 import { roomLimit } from '../config';
+import { validAction, MESSAGE_LIMIT } from '../security';
 
 export const liveRooms = new Map<string, RaceRoom>();
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -12,6 +13,7 @@ function newCode(): string { let code: string; do { code = Array.from({ length: 
 
 export class RaceRoom extends Room<{ state: RaceSchema; input: FlightInput }> {
   maxClients = 8;
+  maxMessagesPerSecond = MESSAGE_LIMIT;
   model!: GameSession;
   inputs = this.defineInput(FlightInput, {
     bufferMaxSize: 32,
@@ -23,6 +25,7 @@ export class RaceRoom extends Room<{ state: RaceSchema; input: FlightInput }> {
   private tickTimes: number[] = [];
   private tickCursor = 0;
   private publishedPhase = 'lobby';
+  private lastActivity = Date.now();
   private publishPhase(): void {
     if (this.publishedPhase === this.state.phase) return;
     this.publishedPhase = this.state.phase;
@@ -33,20 +36,29 @@ export class RaceRoom extends Room<{ state: RaceSchema; input: FlightInput }> {
     const sorted = [...this.tickTimes].sort((a, b) => a - b);
     return { players: this.state.players.size, phase: this.state.phase, p95TickMs: +(sorted[Math.floor(sorted.length * .95)] ?? 0).toFixed(3), maxInputQueue: Math.max(0, ...[...this.state.players.keys()].map(id => this.inputs.get(id).size)) };
   }
-  onCreate(options: { isPublic?: boolean; courseId?: string }): void {
+  onCreate(options: { isPublic?: boolean; courseId?: string; protocolVersion?: number; physicsVersion?: string }): void {
+    if (options.protocolVersion !== PROTOCOL_VERSION || options.physicsVersion !== PHYSICS_VERSION) throw new ServerError(400, 'Game updated. Refresh this page to join.');
+    if ((options.isPublic !== undefined && typeof options.isPublic !== 'boolean') || (options.courseId !== undefined && typeof options.courseId !== 'string')) throw new ServerError(400, 'Invalid room options.');
     if (liveRooms.size >= roomLimit()) throw new ServerError(503, 'Server full: all rooms are busy. Join an existing room or try again after a race ends.');
     this.model = new GameSession(!!options.isPublic, newCode(), options.isPublic ? COURSES[randomInt(COURSES.length)].id : options.courseId); this.state = this.model.state;
     liveRooms.set(this.state.code, this); this.setPatchRate(50);
     this.setMetadata({ code: this.state.code, isPublic: this.state.isPublic, phase: 'lobby' });
-    this.onMessage('action', (client, action: { type?: string; value?: unknown; raceId?: number; hash?: string }) => {
+    this.clock.setInterval(() => {
+      if (this.state.phase === 'lobby' && Date.now() - this.lastActivity > 10 * 60 * 1000) {
+        this.broadcast('notice', 'This inactive lobby has closed. Create a new room when your flock is ready.');
+        void this.disconnect(4000);
+      }
+    }, 30000);
+    this.onMessage('action', (client, action: unknown) => {
       const now = Date.now(), last = this.messageTimes.get(client.sessionId) ?? 0;
-      if (now - last < 40 || !action || typeof action !== 'object') return;
+      if (now - last < 40 || !validAction(action, this.state.raceId)) return;
       this.messageTimes.set(client.sessionId, now);
+      this.lastActivity = now;
       switch (action.type) {
         case 'ready': this.model.ready(client.sessionId, action.value === true); break;
-        case 'map': this.model.selectCourse(client.sessionId, String(action.value)); break;
+        case 'map': this.model.selectCourse(client.sessionId, action.value as string); break;
         case 'start': if (!this.model.start(client.sessionId)) client.send('notice', 'At least two birds must be ready.'); break;
-        case 'loaded': this.model.loaded(client.sessionId, String(action.hash), Number(action.raceId)); break;
+        case 'loaded': this.model.loaded(client.sessionId, action.hash!, action.raceId!); break;
         case 'again': this.model.again(client.sessionId); break;
       }
       this.publishPhase();
@@ -68,7 +80,7 @@ export class RaceRoom extends Room<{ state: RaceSchema; input: FlightInput }> {
     if (options.protocolVersion !== PROTOCOL_VERSION || options.physicsVersion !== PHYSICS_VERSION) throw new Error('Game updated. Refresh this page to join.');
     return true;
   }
-  onJoin(client: Client, options: { name?: unknown; color?: unknown }): void { this.model.join(client.sessionId, options); }
+  onJoin(client: Client, options: { name?: unknown; color?: unknown }): void { this.lastActivity = Date.now(); this.model.join(client.sessionId, options); }
   async onDrop(client: Client): Promise<void> {
     const p = this.state.players.get(client.sessionId); if (!p) return;
     if (this.state.phase !== 'racing') return;

@@ -4,6 +4,8 @@ import './intro.css';
 import './nametags.css';
 import './loading.css';
 import './mobile.css';
+import './capacity.css';
+import { updateCapacity } from './capacity';
 import { LoadingFeedback } from './loading';
 import { connectionError } from './network/availability';
 import type { ServerHealth } from '../shared/server-health';
@@ -47,6 +49,9 @@ let debug = new URLSearchParams(location.search).has('debug');
 let cueUntil = 0;
 let previousParty = '', previousPickupMask = 0;
 let previousTricks = 0, previousGates = 0;
+let statusPending = false, lastStatusAttempt = 0, lastStatusChecked = 0;
+let lastHealth: ServerHealth | undefined;
+let statusState: 'checking' | 'ready' | 'offline' = 'checking';
 
 function toast(message: string) {
   toastElement.textContent = message; toastElement.classList.add('show'); clearTimeout(toastTimer);
@@ -63,6 +68,7 @@ function showHome() {
   view = 'home'; practice = undefined; practiceTick = 0; controls.enabled = false; controls.clear();
   document.body.dataset.view = 'home'; home.hidden = false; hud.hidden = true; hud.innerHTML = '';
   home.innerHTML = homeTemplate(selected); setModal('', ''); scene?.showMenu(); resultsKey = ''; raceCourse = '';
+  updateCapacity(lastHealth, statusState, lastStatusChecked);
   void updateServerStatus();
 }
 function resetFeedback() { previousCrashCount = 0; previousCheckpoint = 0; finishSoundPlayed = false; previousCountdown = -1; cueUntil = 0; resultsKey = ''; previousParty = ''; previousPickupMask = 0; previousTricks = 0; previousGates = 0; }
@@ -129,6 +135,7 @@ document.addEventListener('click', async event => {
     case 'home': if (!connection.room && view === 'home') closeModal(); break;
     case 'help': setModal(helpModal(), 'help'); break;
     case 'settings': setModal(settingsModal(p, scene?.renderer ?? 'Loading', view === 'race', !!practice), 'settings'); break;
+    case 'refresh-status': void updateServerStatus(); break;
     case 'close': if (modalKind === 'profile') connection.cancelConnect(); if (modalKind === 'lobby' || modalKind === 'results') await leave(); else if (connection.room?.state.phase === 'lobby') { lobbySignature = ''; modalKind = ''; connection.changed(); } else closeModal(); break;
     case 'practice': startPractice(); break;
     case 'course': selected = target.dataset.course!; document.querySelector('#course-grid')!.innerHTML = courseCards(selected); break;
@@ -186,16 +193,26 @@ document.addEventListener('visibilitychange', () => { audio.setHidden(document.h
 
 async function updateServerStatus() {
   const text = document.querySelector('#server-status-text'); if (!text) return;
+  if (statusPending || document.hidden || view !== 'home' || Date.now() - lastStatusAttempt < 15000) return;
+  statusPending = true; lastStatusAttempt = Date.now();
+  const refresh = document.getElementById('capacity-refresh') as HTMLButtonElement | null;
+  if (refresh) refresh.disabled = true;
   try {
     const response = await fetch(`${SERVER_URL}/health`, { signal: AbortSignal.timeout(2500), cache: 'no-store' });
     if (!response.ok) throw new Error('offline');
     const health = await response.json() as ServerHealth;
     if (health.status !== 'ok') throw new Error('not a multiplayer server');
+    lastHealth = health; statusState = 'ready'; lastStatusChecked = Date.now();
+    updateCapacity(lastHealth, statusState, lastStatusChecked);
     const full = health.capacity && !health.capacity.acceptingNewRooms && health.capacity.availablePublicSeats === 0;
     text.textContent = full ? 'All rooms busy · join with a code' : `Multiplayer ready${health.capacity ? ` · ${health.rooms}/${health.capacity.maxRooms} rooms` : ''}`;
     document.querySelector('.server-status')?.classList.toggle('online', !full);
   }
-  catch { text.textContent = 'Solo practice ready'; document.querySelector('.server-status')?.classList.remove('online'); }
+  catch { statusState = 'offline'; lastStatusChecked = Date.now(); updateCapacity(undefined, statusState, lastStatusChecked); text.textContent = 'Solo practice ready'; document.querySelector('.server-status')?.classList.remove('online'); }
+  finally {
+    statusPending = false;
+    setTimeout(() => { if (refresh?.isConnected) refresh.disabled = false; }, Math.max(0, 15000 - (Date.now() - lastStatusAttempt)));
+  }
 }
 function cue(html: string, duration = 0) { const el = document.querySelector('#center-cue'); if (el) el.innerHTML = html; if (duration) cueUntil = performance.now() + duration; }
 function updateHud(now: number, players: PlayerSnapshot[], localId: string, elapsed: number, countdown: number, hazardSeconds: number) {

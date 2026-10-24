@@ -13,6 +13,13 @@
 
 # Local verification — 2026-10-22
 
+## Multiplayer beta hardening and capacity — 2026-10-24
+
+- **88 unit/integration tests** pass, including real-server abuse regressions: limits before Colyseus routing, oversized/chunked bodies, malformed forwarding/Host headers, Express route aliases, foreign origins, spoofed forwarding IPs, invalid admission, oversize WebSocket frames and per-client message floods. An unaffected guest remains connected after offenders are dropped. Type checking and production build pass; production dependency audit reports zero known vulnerabilities for the installed lockfile.
+- **Seven focused browser checks** pass for the capacity panel's counts/full/offline states, throttled refresh, code joins at capacity, phone width, two-browser race startup, same-domain deployment routing and cold-start cancellation. Fresh screenshots of the desktop landing page were inspected. This does not claim the older full visual/mobile suite is entirely green.
+- Security review identified malformed proxy URL headers reaching a native router shutdown path, plus case/trailing-slash aliases bypassing the new guards. Both findings are fixed and reproduced in regressions. Cloudflare's four native rate-limit bindings validate in a Wrangler deployment dry-run.
+- Defaults, per-IP/shared-network tradeoffs and anonymous public-beta limitations are recorded in [SECURITY-BASELINE.md](SECURITY-BASELINE.md). These controls do not certify protection against distributed attacks, bot occupancy or platform resource exhaustion.
+
 ## Same-domain multiplayer gateway — 2026-10-24
 
 - The earlier direct-endpoint repair worked in fresh test sessions, but the user still reported the generic unreachable-server error after roughly a minute on the public site. This timing corresponds to failing health checks, despite Render being healthy from the test environment. The precise browser/network cause was not independently captured.

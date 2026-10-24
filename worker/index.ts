@@ -1,4 +1,6 @@
-interface Env {
+import { prepareGatewayRequest, type GatewayLimits } from './policy';
+
+interface Env extends GatewayLimits {
   ASSETS: { fetch(request: Request): Promise<Response> };
   MULTIPLAYER_BACKEND: string;
 }
@@ -9,11 +11,13 @@ export default {
     const websocket = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
     const api = url.pathname === '/health' || url.pathname.startsWith('/api/') || url.pathname.startsWith('/matchmake/');
     if (!api && !websocket) return env.ASSETS.fetch(request);
+    const prepared = await prepareGatewayRequest(request, env);
+    if (prepared instanceof Response) return prepared;
 
     // The upstream host comes only from deployment configuration, never a client path.
     const upstream = new URL(env.MULTIPLAYER_BACKEND);
     upstream.pathname = url.pathname; upstream.search = url.search;
-    const forwarded = new Request(upstream, request);
+    const forwarded = new Request(upstream, prepared);
     forwarded.headers.delete('Host');
     try {
       const response = await fetch(forwarded, { redirect: 'manual' });

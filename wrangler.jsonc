@@ -13,6 +13,12 @@
   "vars": {
     "MULTIPLAYER_BACKEND": "https://openaistudencollectivegndu-3d-flaptrials.onrender.com"
   },
+  "ratelimits": [
+    { "name": "CREATION_LIMIT", "namespace_id": "9375101", "simple": { "limit": 12, "period": 60 } },
+    { "name": "API_LIMIT", "namespace_id": "9375102", "simple": { "limit": 120, "period": 60 } },
+    { "name": "UPGRADE_LIMIT", "namespace_id": "9375103", "simple": { "limit": 240, "period": 60 } },
+    { "name": "HEALTH_LIMIT", "namespace_id": "9375104", "simple": { "limit": 600, "period": 60 } }
+  ],
   "routes": [
     { "pattern": "flaptrials.divii.xyz", "custom_domain": true }
   ]

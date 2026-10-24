@@ -126,6 +126,14 @@ Use one process initially. Room-code lookup and room limits are process-local; m
 
 The public frontend is deployed on Cloudflare and its multiplayer backend runs on Render. Keep matching client/server branches deployed. Free Render instances may need about a minute to wake; the connection screen supports waiting and cancellation. Full servers/rooms, loading progress and reconnection have player-facing feedback. Lobby/countdown/results clients do not send flight inputs; race simulation remains 60 Hz with 20 Hz state patches.
 
+## Multiplayer beta safeguards and capacity
+
+The landing page shows live room occupancy, room slots available, racers in rooms and seats in public lobbies. It refreshes once a minute while visible; manual refresh has a 15-second cooldown. Full servers disable the panel's hosting action while keeping code joins available. Capacity is a configured admission cap, not a hardware performance guarantee.
+
+The Cloudflare gateway limits room requests, API calls, WebSocket upgrades and status checks separately. The server also guards requests before Colyseus matchmaking, checks browser origins, bounds HTTP bodies to 8 KB and WebSocket frames to 4 KB, disconnects message floods, validates lobby actions and closes inactive lobbies after ten minutes. Malformed URL/proxy headers are rejected before the framework router. Names/colors and race outcomes remain server validated.
+
+See [security baseline and limits](docs/SECURITY-BASELINE.md) for defaults, tests and remaining public-beta limitations. These protections do not add accounts or claim to stop distributed attacks.
+
 ## Third-party licenses
 
 Babylon.js: Apache-2.0. Colyseus: MIT. Fredoka and Manrope fonts: SIL Open Font License; license files are included with the fonts. WebGPU shader compiler files are copied from the installed Babylon package by `postinstall`.
