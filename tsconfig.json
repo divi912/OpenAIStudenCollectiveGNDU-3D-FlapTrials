@@ -6,5 +6,5 @@
     "resolveJsonModule": true, "types": ["node"],
     "useDefineForClassFields": false
   },
-  "include": ["client", "server", "shared", "scripts", "tests", "*.ts"]
+  "include": ["client", "server", "shared", "worker", "scripts", "tests", "*.ts"]
 }

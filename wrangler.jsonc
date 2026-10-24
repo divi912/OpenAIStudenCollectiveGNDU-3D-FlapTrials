@@ -1,11 +1,17 @@
 {
   "name": "openaistudencollectivegndu-3d-flaptrials",
+  "main": "worker/index.ts",
   "compatibility_date": "2026-10-23",
   "workers_dev": false,
   "preview_urls": false,
   "assets": {
     "directory": "./dist/client",
+    "binding": "ASSETS",
+    "run_worker_first": ["/health", "/api/*", "/matchmake/*"],
     "not_found_handling": "none"
+  },
+  "vars": {
+    "MULTIPLAYER_BACKEND": "https://openaistudencollectivegndu-3d-flaptrials.onrender.com"
   },
   "routes": [
     { "pattern": "flaptrials.divii.xyz", "custom_domain": true }

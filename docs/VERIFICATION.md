@@ -13,6 +13,14 @@
 
 # Local verification — 2026-10-22
 
+## Same-domain multiplayer gateway — 2026-10-24
+
+- The earlier direct-endpoint repair worked in fresh test sessions, but the user still reported the generic unreachable-server error after roughly a minute on the public site. This timing corresponds to failing health checks, despite Render being healthy from the test environment. The precise browser/network cause was not independently captured.
+- The public browser endpoint is now the game's own domain. A small Cloudflare Worker forwards health, room-code lookup, matchmaking and WebSocket upgrades to the fixed Render upstream. Browsers no longer need direct HTTP/WebSocket access to `onrender.com`. Static assets retain their normal serving path. This supersedes the direct-browser Render route described in the historical section below.
+- **80 unit/integration tests**, type checking and the production build pass. Three focused browser checks pass, including production endpoint selection with direct Render HTTP requests blocked, two-browser race startup and cold-start cancellation. Worker tests cover request bodies/methods/origins, fixed-host URL mapping, socket upgrade response preservation, static asset routing and retryable upstream failures.
+- An actual local Wrangler/Workerd gateway connected **two browsers to the live Render server** with direct browser HTTP access to Render blocked: both reached `racing`, had matching start tick **1141**, and transmitted **20/25 input frames** at sampling. Captured WebSocket URLs used the gateway host, not Render. This is a real proxy/transport check beyond mocked unit tests. A Wrangler deployment dry-run also validates the asset and upstream bindings.
+- The user's own browser must still confirm recovery after the public rollout; this evidence does not claim to reproduce their exact network environment.
+
 ## Render connection repair — 2026-10-24
 
 - Pulled the integrated `main` checkpoint `f462def`, including touch controls, camera/intro changes and server feedback. The live Cloudflare bundle contained `SERVER_URL = location.origin` and no Render URL. Browser room creation retried the static host's `/health` (404), so it never reached matchmaking. Render's health, room creation and WebSockets worked when reached directly.

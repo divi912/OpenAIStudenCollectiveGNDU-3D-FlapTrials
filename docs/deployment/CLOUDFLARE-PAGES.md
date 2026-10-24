@@ -1,11 +1,12 @@
-# Cloudflare Workers hosting and LAN multiplayer
+# Cloudflare Workers hosting, multiplayer gateway and LAN play
 
 ## Public website: Workers Static Assets
 
 `flaptrials.divii.xyz` is hosted directly by the existing Worker
 `openaistudencollectivegndu-3d-flaptrials`, using Workers Static Assets.
-`wrangler.jsonc` uploads only `dist/client` and attaches the custom domain.
-No proxy Worker or Pages origin is required. Cloudflare manages the Worker's
+`wrangler.jsonc` uploads `dist/client` and `worker/index.ts`, and attaches the custom domain.
+The same Worker serves assets and forwards multiplayer to Render; no separate
+Worker or Pages origin is required. Cloudflare manages the Worker's
 domain routing and underlying DNS; DNS is still involved, but no separate
 Pages CNAME needs to be managed manually.
 
@@ -21,19 +22,24 @@ command `npx wrangler@4.152.0 deploy --keep-vars`. The checked-in config supplie
 the Worker name, assets directory and custom domain. A local Wrangler deploy
 does not itself enable Git-triggered builds.
 
-The public frontend connects to the Node/Colyseus backend at
-`https://openaistudencollectivegndu-3d-flaptrials.onrender.com`, configured in
-`.env.cloudflare`. This file is public configuration, not a credential.
+The public frontend connects to its own origin, `https://flaptrials.divii.xyz`,
+configured in `.env.cloudflare`. The Worker forwards `/health`, `/api/*`,
+`/matchmake/*` and WebSocket upgrades to the Node/Colyseus backend at
+`https://openaistudencollectivegndu-3d-flaptrials.onrender.com`.
+The upstream is the `MULTIPLAYER_BACKEND` variable in `wrangler.jsonc`.
+These are public addresses, not credentials. Browsers do not need to reach
+the Render domain directly, so cross-origin restrictions or client-side
+blocking of that domain do not prevent joining.
 Both `npm run build` and `npm run build:cloudflare` now embed the public origin
 and backend mapping from that file. When opened on `VITE_CLIENT_ORIGIN`, either
-build connects to Render; local/LAN and preview hosts continue using their own
+build connects to the public gateway; local/LAN and preview hosts continue using their own
 server. An explicit `VITE_SERVER_URL` always overrides this selection. If you
-change the public domain or backend, update both entries in `.env.cloudflare`
-and rebuild the frontend.
+change the public domain, update both entries in `.env.cloudflare` and rebuild.
+To change the Render upstream, update `MULTIPLAYER_BACKEND` in `wrangler.jsonc`.
 
 This prevents a Git-connected Worker built with the ordinary build command from
-requesting `/health` on the static Cloudflare host. That endpoint returns 404
-there because Workers Static Assets does not run the multiplayer server. A
+using the wrong backend. The Worker script now handles `/health` rather than
+letting the static-assets handler return 404. A
 missing backend endpoint now produces an immediate setup error instead of a
 75-second cold-start retry. Actual temporary Render failures are still retried.
 
@@ -45,7 +51,11 @@ Render's free service can take about a minute to wake up after inactivity;
 the connection screen waits and retries while it wakes. Server restarts discard
 active rooms.
 
-Workers Static Assets serves only the frontend; Render runs multiplayer.
+Static assets still bypass Worker execution when matched. API paths run the
+Worker first; unknown WebSocket room paths reach the Worker because no asset
+matches them. The gateway forwards WebSocket upgrades without cloning the
+upgraded response, preserving the socket. Render still owns all race state.
+API replies are never cached; failed upstream requests return a retryable 502.
 Ordinary `npm run build` and `npm run lan` continue connecting to the local
 server when opened on a local/LAN host. LAN play remains available below.
 

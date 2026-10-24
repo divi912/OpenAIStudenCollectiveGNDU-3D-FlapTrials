@@ -118,7 +118,7 @@ npm start
 
 The Node server serves the production client at **http://localhost:2567**. Build output is separated into `dist/client` and `dist/server`.
 
-The public frontend at **https://flaptrials.divii.xyz** is hosted by **Cloudflare Workers Static Assets**; multiplayer runs on **Render**. Both production build modes recognize the public website and use the backend configured in `.env.cloudflare`. Local/LAN and preview hosts use their own server. `VITE_SERVER_URL` can explicitly override this choice. This avoids sending multiplayer requests to the static Cloudflare host, which has no `/health` or matchmaking API.
+The public frontend at **https://flaptrials.divii.xyz** is hosted by **Cloudflare Workers Static Assets**; multiplayer runs on **Render**. The same Cloudflare Worker forwards health, matchmaking and WebSockets to Render, so the browser uses only the game's own domain. Both production build modes recognize this gateway from `.env.cloudflare`. Its upstream is `MULTIPLAYER_BACKEND` in `wrangler.jsonc`. Local/LAN and preview hosts use their own server. `VITE_SERVER_URL` can explicitly override this choice.
 
 The repository's Git-connected Worker build deploys changes from `main`. For a manual deployment, run `npm run deploy:cloudflare` after authenticating with Wrangler. See [Cloudflare, Render and LAN hosting](docs/deployment/CLOUDFLARE-PAGES.md). A Dockerfile and PM2 configuration are included. `PORT` defaults to 2567, `CLIENT_ORIGIN` defaults to `*` (set it to `https://flaptrials.divii.xyz` on Render), and `MAX_ROOMS` defaults to 10.
 
