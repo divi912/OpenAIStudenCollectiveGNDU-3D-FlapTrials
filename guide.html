@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#5840d8" />
+  <meta name="description" content="Flap Trials controls, race rules, courses, boost, Flap Points, items and multiplayer rooms." />
+  <title>Game Guide · Flap Trials</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+</head>
+<body>
+  <a class="skip" href="#rules">Skip to guide</a>
+  <header><a class="brand" href="/">Flap <span>Trials</span></a><a class="play" href="/">Back to game →</a></header>
+  <main>
+    <div class="heading"><span>FLAP TRIALS</span><h1>Game Guide</h1></div>
+    <nav aria-label="Guide sections"><a href="#rules">Race rules</a><a href="#controls">Controls</a><a href="#courses">Courses</a><a href="#boost">Boost</a><a href="#shop">Flap Shop</a><a href="#items">Items</a><a href="#rooms">Multiplayer</a><a href="#settings">Settings</a></nav>
+    <section id="rules"><h2>Race rules</h2><ul><li>Fly through every gate and checkpoint, then cross the finish line. Finish time decides the winner.</li><li>Hitting an obstacle, missing a gate or leaving the course causes a crash. You return to your last checkpoint.</li><li>Practice is solo. Online races support 2–8 players.</li><li>Barrel rolls and clean gates earn style points. Style does not change your finish time or Flap Points.</li></ul></section>
+    <section id="controls"><h2>Controls</h2><div class="table-wrap"><table><caption>Keyboard and touch controls</caption><thead><tr><th>Action</th><th>Keyboard</th><th>Touch</th></tr></thead><tbody>
+      <tr><th>Flap</th><td><kbd>Space</kbd> — one flap per press</td><td>Tap FLAP</td></tr>
+      <tr><th>Turn</th><td><kbd>A</kbd> / <kbd>D</kbd> or ← / →</td><td>Left / right on the pad</td></tr>
+      <tr><th>Pitch</th><td><kbd>W</kbd> / <kbd>S</kbd> or ↑ / ↓</td><td>Up / down on the pad</td></tr>
+      <tr><th>Roll</th><td><kbd>Q</kbd> / <kbd>E</kbd></td><td>Hold either ROLL button</td></tr>
+      <tr><th>Dive</th><td>Hold <kbd>Shift</kbd></td><td>Hold DIVE</td></tr>
+      <tr><th>Boost</th><td>Hold <kbd>F</kbd></td><td>Hold BOOST</td></tr>
+      <tr><th>Race menu</th><td><kbd>Esc</kbd> or the settings icon</td><td>Tap the settings icon</td></tr>
+      <tr><th>Restart practice</th><td><kbd>R</kbd></td><td>Race menu → Restart practice</td></tr>
+    </tbody></table></div><p>Pitch aims your bird; flapping provides lift. Roll through narrow twist slots. Diving trades height for speed. Touch controls support multiple fingers.</p></section>
+    <section id="courses"><h2>Courses</h2><p>Three courses per difficulty. Each course in a tier is harder than the previous one.</p><div id="course-list" class="course-list"></div></section>
+    <section id="boost"><h2>Boost and pickups</h2><dl id="boost-rules"></dl><p>Gold crystals refill boost. Blue crystals protect against frame scrapes for 4 seconds. Shields cannot bypass a missed opening or the course boundaries.</p><h3>Race events</h3><p>Warnings appear before each shared event: Tailwind increases speed, Low Gravity reduces falling, and Gusts add crosswind.</p></section>
+    <section id="shop"><h2>Flap Points and the shop</h2><ol id="shop-rules"></ol><p>Unused points carry to halfway. Points and equipment reset each race. Permanent upgrades do not stack. You can buy a spent Guard or Jammer charge again at halfway.</p></section>
+    <section id="items"><h2>Items</h2><div class="table-wrap"><table><caption>Flap Shop prices and effects</caption><thead><tr><th>Item</th><th>Cost</th><th>Effect</th></tr></thead><tbody id="item-list"></tbody></table></div><p>Items work automatically. Hold F or BOOST to use your boost reserve. Jammer fires at the nearest eligible rival ahead; it leaves their steering and flapping available. After a jam, that rival is immune to further jams for 10 seconds. Jammer is unavailable in practice.</p></section>
+    <section id="rooms"><h2>Multiplayer rooms</h2><dl><div><dt>Play online</dt><dd>Join a public race. It starts automatically when at least two players are ready.</dd></div><div><dt>Create room</dt><dd>Create a private room and share its six-character code. The host chooses the course. Everyone selects Ready up; the host starts the race.</dd></div><div><dt>Join room</dt><dd>Enter a room code, choose your name and color, then select Ready up.</dd></div><div><dt>Race again</dt><dd>Return to the lobby after results. The host can select another course.</dd></div></dl><p>No account is required. If the server is full or starting up, practice remains available. The race continues while your settings menu is open; the shared halfway shop pauses it for everyone.</p></section>
+    <section id="settings"><h2>Settings</h2><dl><div><dt>Visual quality</dt><dd>Adaptive adjusts resolution to performance. High adds stronger anti-aliasing. Low reduces rendering cost.</dd></div><div><dt>Reduced camera motion</dt><dd>Reduces chase-camera banking and animated effects.</dd></div><div><dt>Audio</dt><dd>Music and sound effects have separate volume controls.</dd></div><div><dt>Personal bests</dt><dd>Stored in your browser for each course and game version. Practice and multiplayer records are separate.</dd></div></dl></section>
+    <footer><a href="/">Back to game →</a></footer>
+  </main>
+  <script type="module" src="/client/guide.ts"></script>
+</body>
+</html>

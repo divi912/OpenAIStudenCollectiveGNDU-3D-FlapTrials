@@ -16,5 +16,5 @@ export default defineConfig({
       '/ws': { target: 'ws://127.0.0.1:2567', ws: true },
     },
   },
-  build: { target: 'es2022', outDir: 'dist/client', chunkSizeWarningLimit: 650 },
+  build: { target: 'es2022', outDir: 'dist/client', chunkSizeWarningLimit: 650, rolldownOptions: { input: ['index.html', 'guide.html'] } },
 });
