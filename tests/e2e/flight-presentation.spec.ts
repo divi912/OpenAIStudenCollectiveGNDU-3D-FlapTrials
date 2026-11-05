@@ -11,6 +11,7 @@ for (const reducedMotion of [false, true]) {
     await page.clock.install({ time: start });
     await page.clock.pauseAt(new Date(start.getTime() + 1000));
     await page.getByRole('button', { name: 'Practice' }).click();
+    await page.getByRole('button', { name: 'Ready to race', exact: true }).click();
     await page.clock.fastForward(9200);
     const tag = page.locator('.bird-nametag.local');
     await expect(tag).toBeVisible();

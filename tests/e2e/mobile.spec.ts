@@ -10,6 +10,7 @@ test('phone flight uses multiple fingers, releases cancelled touches, and fits r
   await expect(page.getByRole('heading', { name: 'Touch controls' })).toBeVisible();
   await page.getByRole('button', { name: 'Done' }).click();
   await page.getByRole('button', { name: 'Practice', exact: true }).click();
+  await page.getByRole('button', { name: 'Ready to race', exact: true }).click();
   await expect(page.locator('.touch-controls')).toBeVisible({ timeout: 20000 });
   const session = await context.newCDPSession(page);
   const point = async (name: string) => {

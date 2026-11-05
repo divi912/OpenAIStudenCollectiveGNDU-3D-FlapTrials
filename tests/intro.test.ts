@@ -22,7 +22,9 @@ it('holds all racers at spawn through the intro and starts on one shared tick', 
   session.start('a');
   for (const id of ['a', 'b']) session.loaded(id, session.state.courseHash, session.state.raceId);
   session.step(1, new Map());
-  expect(session.state.startTick).toBe(1 + PRE_RACE_SECONDS * 60);
+  expect(session.state.phase).toBe('shopping');
+  session.finishBuying('a'); session.finishBuying('b'); session.step(2, new Map());
+  expect(session.state.startTick).toBe(2 + PRE_RACE_SECONDS * 60);
   session.step(session.state.startTick - 1, new Map());
   expect(session.state.phase).toBe('countdown');
   for (const player of session.state.players.values()) expect(player.z).toBe(0);

@@ -6,6 +6,7 @@ test('manual boost spends stored reserve and has an accessible live meter', asyn
   const start=new Date('2026-11-05T10:00:00Z');
   await page.clock.install({time:start}); await page.clock.pauseAt(new Date(start.getTime()+1000));
   await page.getByRole('button', { name: 'Practice', exact: true }).click();
+  await page.getByRole('button', { name: 'Ready to race', exact: true }).click();
   await page.clock.fastForward(9300); await page.clock.runFor(50);
   await page.waitForFunction(() => (window as any).__flap.practice?.z > 1, undefined, { timeout: 15000 });
   const before = await page.evaluate(() => (window as any).__flap.practice.boostReserve);
@@ -26,6 +27,7 @@ test('boost meter and touch controls fit small phones and landscape', async ({ p
   await page.goto('/?webgl=1');
   await expect(page.locator('body')).toHaveAttribute('data-renderer', 'WebGL2', { timeout: 45000 });
   await page.getByRole('button', { name: 'Practice', exact: true }).click();
+  await page.getByRole('button', { name: 'Ready to race', exact: true }).click();
   await expect(page.locator('#hud')).toBeVisible({ timeout: 15000 });
   for (const size of [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(size);

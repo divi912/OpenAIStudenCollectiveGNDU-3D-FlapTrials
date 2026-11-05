@@ -8,6 +8,7 @@ test('solid audience birds scale down with quality and survive practice restarts
   await page.getByLabel('Visual quality').selectOption('high');
   await page.getByRole('button', { name: 'Done' }).click();
   await page.getByRole('button', { name: 'Practice' }).click();
+  await page.getByRole('button', { name: 'Ready to race', exact: true }).click();
   await page.waitForFunction(() => (window as any).__flap.stats.audience.birds > 0);
   const high = await page.evaluate(() => (window as any).__flap.stats.audience);
   expect(high.birds).toBeGreaterThan(300); expect(high.draws).toBeLessThanOrEqual(6);
@@ -36,7 +37,9 @@ test('solid audience birds scale down with quality and survive practice restarts
   await page.clock.pauseAt(new Date(start.getTime() + 1000));
   const restartCounts: number[] = [];
   for (let i = 0; i < 3; i++) {
-    await page.keyboard.press('KeyR'); await page.clock.runFor(50);
+    await page.keyboard.press('KeyR');
+    await page.getByRole('button', { name: 'Ready to race', exact: true }).click();
+    await page.clock.fastForward(9300); await page.clock.runFor(50);
     restartCounts.push((await page.evaluate(() => (window as any).__flap.stats.audience)).birds);
   }
   expect(restartCounts[0]).toBeGreaterThan(0);

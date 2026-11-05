@@ -9,6 +9,7 @@ test('solo previews the course and lineup without advancing the race', async ({ 
   await page.clock.install({ time: clockStart });
   await page.clock.pauseAt(new Date(clockStart.getTime() + 1000));
   await page.getByRole('button', { name: 'Practice' }).click();
+  await page.getByRole('button', { name: 'Ready to race', exact: true }).click();
   await page.clock.runFor(100);
   await expect(page.locator('#race-intro')).toBeVisible();
   await expect(page.locator('#intro-label')).toHaveText('COURSE');

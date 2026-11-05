@@ -3,6 +3,7 @@ import { idleInput, stepRacer } from '../shared/physics';
 import { COLORS, cleanName, type InputFrame } from '../shared/protocol';
 import { PlayerSchema, RaceSchema } from '../shared/schema';
 import { PRE_RACE_SECONDS } from '../shared/intro';
+import { SHOP, openShop, closeShop, purchase, resolveJammers, shiftRaceTimers } from '../shared/shop';
 
 const neutralInput = Object.freeze(idleInput());
 
@@ -37,7 +38,35 @@ export class GameSession {
   }
   private beginLoading(): void {
     this.state.phase = 'loading'; this.state.deadline = this.state.tick + 1800;
+    this.state.shopRound = 0; this.state.shopStartedTick = 0;
     for (const p of this.state.players.values()) { p.reset(); p.ready = true; }
+  }
+  private beginShop(halfway: boolean): void {
+    const s = this.state;
+    s.phase = 'shopping'; s.shopRound = halfway ? 1 : 0; s.shopStartedTick = s.tick;
+    s.deadline = s.tick + (halfway ? SHOP.halfwaySeconds : SHOP.startSeconds) * 60;
+    for (const p of s.players.values()) openShop(p, s.deadline, halfway);
+  }
+  buy(id: string, itemId: string): boolean {
+    const s = this.state, p = s.players.get(id);
+    return !!p && p.connected && s.phase === 'shopping' && s.tick < s.deadline && purchase(p, itemId);
+  }
+  finishBuying(id: string): boolean {
+    const p = this.state.players.get(id);
+    if (!p || !p.connected || this.state.phase !== 'shopping') return false;
+    closeShop(p); return true;
+  }
+  private finishShop(): void {
+    const s = this.state;
+    for (const p of s.players.values()) closeShop(p);
+    if (!s.shopRound) { s.phase = 'countdown'; s.startTick = s.tick + PRE_RACE_SECONDS * 60; }
+    else {
+      const paused = s.tick - s.shopStartedTick;
+      s.startTick += paused;
+      for (const p of s.players.values()) shiftRaceTimers(p, paused);
+      s.phase = 'racing';
+    }
+    s.deadline = 0;
   }
   loaded(id: string, hash: string, raceId: number): boolean {
     const p = this.state.players.get(id);
@@ -47,6 +76,7 @@ export class GameSession {
   again(id: string): void {
     if (!this.state.players.has(id) || this.state.phase !== 'results') return;
     this.state.raceId++; this.state.phase = 'lobby'; this.state.deadline = 0; this.state.startTick = 0;
+    this.state.shopRound = 0; this.state.shopStartedTick = 0;
     for (const [playerId, p] of this.state.players) if (!p.connected) this.remove(playerId);
     for (const p of this.state.players.values()) { p.reset(); p.ready = this.state.isPublic; }
   }
@@ -68,8 +98,16 @@ export class GameSession {
       let allLoaded = true;
       for (const p of s.players.values()) if (!p.loaded || !p.connected) { allLoaded = false; break; }
       if (allLoaded) {
-        s.phase = 'countdown'; s.startTick = tick + PRE_RACE_SECONDS * 60;
+        this.beginShop(false);
       }
+    }
+    if (s.phase === 'shopping') {
+      const connected = [...s.players.values()].filter(p => p.connected);
+      if (!s.shopRound && connected.length < 2) {
+        for (const p of s.players.values()) { p.reset(); p.ready = s.isPublic; }
+        s.phase = 'lobby'; s.deadline = 0; return;
+      }
+      if (tick >= s.deadline || connected.every(p => p.shopReady)) this.finishShop();
     }
     if (s.phase === 'countdown' && tick >= s.startTick) {
       let connected = 0;
@@ -79,7 +117,11 @@ export class GameSession {
     }
     if (s.phase !== 'racing') { for (const p of s.players.values()) p.simulationTick = tick; return; }
     const course = getCourse(s.courseId);
+    resolveJammers(s.players.values(), tick);
     for (const [id, p] of s.players) stepRacer(p, p.connected ? inputs.get(id) ?? neutralInput : neutralInput, course, tick, s.startTick);
+    if (!s.shopRound && [...s.players.values()].some(p => p.connected && p.status === 'racing' && p.z >= course.definition.length / 2)) {
+      this.beginShop(true); return;
+    }
     if (tick - s.startTick >= Math.max(180, course.definition.estimatedClearSeconds + 90) * 60) {
       for (const p of s.players.values()) if (p.status !== 'finished') p.status = 'dnf';
     }

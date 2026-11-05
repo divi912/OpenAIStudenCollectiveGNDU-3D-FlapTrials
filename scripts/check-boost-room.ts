@@ -24,6 +24,7 @@ try {
     room.onMessage('notice', console.log);
     room.onStateChange(state => {
       if (state.phase === 'loading') room.send('action', { type: 'loaded', raceId: state.raceId, hash: state.courseHash });
+      if (state.phase === 'shopping' && !state.players.get(room.sessionId)?.shopReady) room.send('action', { type: 'shop-done', raceId: state.raceId });
     });
     room.send('action', { type: 'ready', value: true });
   }

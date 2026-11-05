@@ -33,6 +33,7 @@ test('nine courses stay grouped, selectable and usable across screen sizes', asy
     await page.screenshot({ path: `.cache/identity-${width}.png`, fullPage: true });
   }
   await page.getByRole('button', { name: 'Practice' }).click();
+  await page.getByRole('button', { name: 'Ready to race', exact: true }).click();
   await expect(page.locator('body')).toHaveAttribute('data-view', 'race');
   await expect(page.locator('#intro-course')).toHaveText('Crown Circuit');
 });

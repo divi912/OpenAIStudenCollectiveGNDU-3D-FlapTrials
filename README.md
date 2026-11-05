@@ -147,6 +147,23 @@ Touch devices have on-screen turn/pitch, flap, dive and roll controls. Portrait 
 
 ## Stored boost and ink rendering
 
-Hold **F** (or the touch **BOOST** button) to spend reserve for extra speed. Start with60%; a full tank lasts4seconds. Normal flight recharges4% per second after a1.5-second delay. Clean gates award6% once each; gold pickups add25%. Crashes cost25%, and respawns do not refill the meter. A new burst needs15%; active bursts can spend the remainder. Dive, events and manual boost share the30 speed cap. Server-authoritative reserve is included in prediction/reconciliation; protocol4 and physicsflight-3d-4 require matching client/server deployment.
+Hold **F** (or the touch **BOOST** button) to spend reserve for extra speed. Start with60%; a full tank lasts4seconds. Normal flight recharges4% per second after a1.5-second delay. Clean gates award6% once each; gold pickups add25%. Crashes cost25%, and respawns do not refill the meter. A new burst needs15%; active bursts can spend the remainder. Dive, events and manual boost share the30 speed cap. Server-authoritative reserve is included in prediction/reconciliation; protocol 5 and physics flight-3d-5 require matching client/server deployment.
 
 Dark world-space outlines mark birds, gates and solid landmarks. Low quality retains racer and gate ink while dropping landmark outlines. Static route ribbons replace overlapping deck boxes; balloons use a single hull and directional landmarks mirror correctly. This treatment uses techniques from the local Three.js skills in Babylon.js; it does not add another renderer.
+
+
+## Flap Points and the shop
+
+Every racer receives 100 Flap Points at the start of a new race. Once models finish loading, a 15-second shared buy phase opens before the course preview and countdown. Buy up to two different items, or keep the points. Everyone confirming ends the buy phase early.
+
+The first racer to reach 50% of the course opens a second shared buy phase for 12 seconds. All racers hold their positions and receive 50 more points. Race time, hazards, recharge delays, respawns and temporary effects pause together, preserving time gaps. Everyone confirming resumes early; otherwise the timer resumes automatically. This happens once per race, including after checkpoint respawns. Savings carry into this shop; all points and equipment reset for a rematch. Practice uses the same economy, with Jammer unavailable.
+
+| Item | FP | Effect |
+| --- | ---: | --- |
+| Boost Cell | 25 | Adds 35 boost reserve, capped at 100. |
+| Crash Guard | 35 | Automatically absorbs one frame scrape with 1s of protection; cannot bypass a missed gate or world bounds. |
+| Capacitor | 45 | Increases boost recharge by 50% for the race. |
+| Jammer | 40 | Automatically blocks the nearest rival's boost for 3s when they are within 45m ahead. Targets gain 10s immunity against further jams; steering and flapping stay available. |
+| Overdrive | 50 | Adds 2 forward speed, retaining the speed cap. Crashes cost 20 extra reserve and add 0.3s to respawn. |
+
+Permanent upgrades do not stack. Guard and Jammer each hold one charge; an already-equipped charge cannot be bought again. A spent charge or Boost Cell can be repurchased at halfway. The server owns prices, points, shop windows, purchases and rival targeting. Buy messages require the current race id. Client/server protocol 5 and physics flight-3d-5 must match.

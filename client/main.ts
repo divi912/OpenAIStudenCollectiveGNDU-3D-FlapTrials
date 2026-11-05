@@ -7,6 +7,9 @@ import './mobile.css';
 import './capacity.css';
 import './identity.css';
 import './race-identity.css';
+import './shop.css';
+import { SHOP, openShop, closeShop, purchase } from '../shared/shop';
+import { shopTemplate, loadoutText } from './shop-view';
 import { updateCapacity } from './capacity';
 import { LoadingFeedback } from './loading';
 import { connectionError } from './network/availability';
@@ -45,6 +48,7 @@ let practice: PlayerSnapshot | undefined;
 let practiceTick = 0, practiceStartTime = 0, accumulator = 0;
 let view: 'home' | 'race' = 'home';
 let modalKind = '', lobbySignature = '', raceCourse = '', resultsKey = '';
+let practiceBuying = false, practiceBuyUntil = 0, practiceShopRound = 0, shopSignature = '';
 let previousCrashCount = 0, previousCheckpoint = 0, finishSoundPlayed = false;
 let previousTime = performance.now(), lastHud = 0, toastTimer = 0, previousCountdown = -1;
 let debug = new URLSearchParams(location.search).has('debug');
@@ -66,9 +70,9 @@ function setModal(html: string, kind: string) {
     const first = modal.querySelector<HTMLElement>('input, button:not(.modal-close), select'); setTimeout(() => first?.focus({ preventScroll: true }), 0);
   }
 }
-function closeModal() { if (modalKind === 'lobby') return; setModal('', ''); controls.enabled = view === 'race'; }
+function closeModal() { if (modalKind === 'lobby' || modalKind === 'shop') return; setModal('', ''); controls.enabled = view === 'race'; }
 function showHome() {
-  view = 'home'; practice = undefined; practiceTick = 0; controls.enabled = false; controls.clear();
+  view = 'home'; practice = undefined; practiceBuying = false; shopSignature = ''; practiceTick = 0; controls.enabled = false; controls.clear();
   document.body.dataset.view = 'home'; home.hidden = false; hud.hidden = true; hud.innerHTML = '';
   home.innerHTML = homeTemplate(selected); setModal('', ''); scene?.showMenu(); resultsKey = ''; raceCourse = '';
   updateCapacity(lastHealth, statusState, lastStatusChecked);
@@ -79,8 +83,43 @@ function startPractice() {
   if (!scene?.ready) { toast('Game assets are still loading.'); return; }
   audio.unlock(); savePreferences(p); resetFeedback(); practiceTick = 0; accumulator = 0;
   practice = { ...createRacer('practice'), name: p.name, color: p.color, ready: true, loaded: true, connected: true };
-  practiceStartTime = performance.now() + PRE_RACE_SECONDS * 1000;
-  openRace(selected, true); closeModal(); controls.enabled = false;
+  practiceBuying = true; practiceShopRound = 0; practiceStartTime = Infinity;
+  practiceBuyUntil = performance.now() + SHOP.startSeconds * 1000;
+  openShop(practice, SHOP.startSeconds * 60);
+  openRace(selected, true); setModal('', ''); controls.enabled = false; shopSignature = ''; updateShop(performance.now());
+}
+function finishPracticeShop(now: number) {
+  if (!practice || !practiceBuying) return;
+  practiceBuying = false; closeShop(practice); accumulator = 0; previousTime = now;
+  if (!practiceShopRound) practiceStartTime = now + PRE_RACE_SECONDS * 1000;
+  if (modalKind === 'shop') setModal('', ''); shopSignature = '';
+}
+function updateShop(now: number) {
+  const room = connection.room;
+  const shopping = practice ? practiceBuying : room?.state.phase === 'shopping';
+  document.body.dataset.shopping = String(!!shopping);
+  if (!shopping) {
+    if (modalKind === 'shop') setModal('', '');
+    shopSignature = ''; return;
+  }
+  const me = practice ?? room?.state.players.get(room.sessionId);
+  if (!me) return;
+  const halfway = practice ? !!practiceShopRound : !!room?.state.shopRound;
+  const ready = practice ? Number(me.shopReady) : [...room!.state.players.values()].filter(p => p.shopReady).length;
+  const total = practice ? 1 : room!.state.players.size;
+  const signature = JSON.stringify([halfway, me.flapPoints, me.boughtMask, me.loadoutMask, me.guardCharges, me.jammerCharges, me.shopReady, me.boostReserve >= 100, ready, total]);
+  if (signature !== shopSignature || modalKind !== 'shop') {
+    const focusedItem = (document.activeElement as HTMLElement)?.dataset.item;
+    setModal(shopTemplate(me, halfway, !!practice, ready, total), 'shop'); shopSignature = signature;
+    // Keep keyboard focus near the last purchase as availability changes.
+    if (focusedItem) requestAnimationFrame(() => {
+      const next = modal.querySelector<HTMLButtonElement>(`[data-item="${focusedItem}"]`);
+      (next && !next.disabled ? next : modal.querySelector<HTMLButtonElement>('.shop-done'))?.focus({ preventScroll: true });
+    });
+  }
+  const seconds = practice ? (practiceBuyUntil - now) / 1000 : (room!.state.deadline - room!.state.tick) / 60;
+  const timer = document.querySelector('#shop-timer'); if (timer) timer.textContent = `${Math.max(0, Math.ceil(seconds))}s`;
+  controls.enabled = false;
 }
 function openRace(courseId: string, isPractice: boolean) {
   view = 'race'; document.body.dataset.view = 'race'; home.hidden = true; hud.hidden = false;
@@ -116,7 +155,12 @@ connection.changed = () => {
     if (view !== 'race' || raceCourse !== s.courseId) { resetFeedback(); openRace(s.courseId, false); setModal('', ''); }
     if (scene?.ready) connection.action('loaded');
     loading.race([...s.players.values()].filter(v => v.loaded).length, s.players.size, (s.deadline - s.tick) / 60, !!scene?.ready);
+  } else if (s.phase === 'shopping') {
+    loading.hide();
+    if (view !== 'race' || raceCourse !== s.courseId) openRace(s.courseId, false);
+    updateShop(performance.now());
   } else if (s.phase === 'countdown' || s.phase === 'racing') {
+    updateShop(performance.now());
     loading.hide();
     if (view !== 'race' || raceCourse !== s.courseId) openRace(s.courseId, false);
     if (modalKind === 'lobby' || modalKind === 'loading') closeModal();
@@ -128,7 +172,7 @@ connection.changed = () => {
 };
 controls.onFlap = () => audio.flap();
 controls.onRestart = () => { if (practice && !modalKind) startPractice(); };
-controls.onMenu = () => { audio.unlock(); if (modalKind === 'settings' || modalKind === 'help') closeModal(); else if (!modalKind || modalKind === 'lobby') setModal(settingsModal(p, scene?.renderer ?? 'Loading', view === 'race', !!practice), 'settings'); };
+controls.onMenu = () => { if (modalKind === 'shop') return; audio.unlock(); if (modalKind === 'settings' || modalKind === 'help') closeModal(); else if (!modalKind || modalKind === 'lobby') setModal(settingsModal(p, scene?.renderer ?? 'Loading', view === 'race', !!practice), 'settings'); };
 
 document.addEventListener('click', async event => {
   const target = (event.target as HTMLElement).closest<HTMLElement>('[data-action]');
@@ -140,6 +184,13 @@ document.addEventListener('click', async event => {
     case 'settings': setModal(settingsModal(p, scene?.renderer ?? 'Loading', view === 'race', !!practice), 'settings'); break;
     case 'refresh-status': void updateServerStatus(); break;
     case 'close': if (modalKind === 'profile') connection.cancelConnect(); if (modalKind === 'lobby' || modalKind === 'results') await leave(); else if (connection.room?.state.phase === 'lobby') { lobbySignature = ''; modalKind = ''; connection.changed(); } else closeModal(); break;
+    case 'buy-item':
+      if (practice && practiceBuying && performance.now() < practiceBuyUntil) { purchase(practice, target.dataset.item!, true); updateShop(performance.now()); }
+      else if (connection.room?.state.phase === 'shopping') connection.action('buy', target.dataset.item);
+      break;
+    case 'shop-done':
+      if (practice) finishPracticeShop(performance.now()); else connection.action('shop-done');
+      break;
     case 'practice': startPractice(); break;
     case 'course': selected = target.dataset.course!; document.querySelector('#course-grid')!.innerHTML = courseCards(selected); break;
     case 'quick': case 'create': case 'join': setModal(profileModal(action, p), 'profile'); break;
@@ -235,12 +286,16 @@ function updateHud(now: number, players: PlayerSnapshot[], localId: string, elap
   const shield = Math.max(0, (local.shieldUntilTick - local.simulationTick) / 60);
   powers.innerHTML = shield ? `<span class="shield-power">Shield <b>${shield.toFixed(1)}s</b></span>` : '';
   powers.hidden = !shield;
+  const jammed = local.jammedUntilTick > local.simulationTick;
+  const wallet = document.querySelector('#flap-points'); if (wallet) wallet.textContent = `${local.flapPoints} FP`;
+  const loadout = document.querySelector('#shop-loadout'); if (loadout) loadout.textContent = jammed ? `Boost jammed · ${Math.ceil((local.jammedUntilTick - local.simulationTick) / 60)}s` : loadoutText(local);
+  loadout?.classList.toggle('shop-jammed', jammed);
   const reserve = Math.max(0, Math.min(100, local.boostReserve));
   document.querySelector('#boost-percent')!.textContent = `${Math.floor(reserve)}%`;
   (document.querySelector('#boost-fill') as HTMLElement).style.width = `${reserve}%`;
   document.querySelector('[aria-label="Stored boost"]')?.setAttribute('aria-valuenow', String(Math.floor(reserve)));
   document.querySelector('.boost-reserve')?.classList.toggle('active', local.boostActive);
-  document.querySelector('#boost-state')!.textContent = countdown > 0 ? 'Ready' : local.boostActive ? 'Boosting' : reserve < 15 ? 'Recharging' : document.body.dataset.touch === 'true' ? 'Hold BOOST' : 'Hold F';
+  document.querySelector('#boost-state')!.textContent = countdown > 0 ? 'Ready' : jammed ? 'Jammed' : local.boostActive ? 'Boosting' : reserve < 15 ? 'Recharging' : document.body.dataset.touch === 'true' ? 'Hold BOOST' : 'Hold F';
   if (local.pickupMask !== previousPickupMask) { previousPickupMask = local.pickupMask; audio.tone(1100, .16); }
   time.textContent = formatTime(local.status === 'finished' ? finishSeconds(local, practice ? 0 : connection.room?.state.startTick ?? 0) : elapsed);
   document.querySelector('#checkpoint-text')!.textContent = `${local.checkpointIndex} / ${course.checkpoints.length}`;
@@ -272,10 +327,17 @@ function frame(now: number) {
   const dt = Math.min(.25, (now - previousTime) / 1000); previousTime = now;
   let players: PlayerSnapshot[] = [], localId = '', elapsed = 0, countdown = 0, raceSeconds = 0;
   if (practice && view === 'race') {
-    countdown = Math.max(0, (practiceStartTime - now) / 1000);
-    if (!countdown && practice.status !== 'finished' && practice.status !== 'dnf') {
+    if (practiceBuying && now >= practiceBuyUntil) finishPracticeShop(now);
+    countdown = practiceBuying ? 0 : Math.max(0, (practiceStartTime - now) / 1000);
+    if (!practiceBuying && !countdown && practice.status !== 'finished' && practice.status !== 'dnf') {
       accumulator += dt;
-      while (accumulator >= DT) { stepRacer(practice, controls.read(practiceTick, practiceTick), getCourse(selected), practiceTick); practiceTick++; accumulator -= DT; }
+      while (accumulator >= DT) {
+        stepRacer(practice, controls.read(practiceTick, practiceTick), getCourse(selected), practiceTick); practiceTick++; accumulator -= DT;
+        if (!practice.midShopVisited && practice.status === 'racing' && practice.z >= getCourse(selected).definition.length / 2) {
+          practiceBuying = true; practiceShopRound = 1; practiceBuyUntil = now + SHOP.halfwaySeconds * 1000;
+          openShop(practice, practiceTick + SHOP.halfwaySeconds * 60, true); accumulator = 0; break;
+        }
+      }
       if (practiceTick >= Math.max(180, getCourse(selected).definition.estimatedClearSeconds + 90) * 60) practice.status = 'dnf';
     }
     players = [practice]; localId = 'practice'; elapsed = practiceTick / 60; raceSeconds = elapsed;
@@ -285,10 +347,10 @@ function frame(now: number) {
     const s = connection.room.state; players = connection.players(); localId = connection.room.sessionId;
     const serverTick = s.tick;
     countdown = s.phase === 'countdown' ? Math.max(0, (s.startTick - serverTick) / 60) : s.phase === 'loading' ? 3 : 0;
-    elapsed = s.phase === 'racing' || s.phase === 'results' ? Math.max(0, (serverTick - s.startTick) / 60) : 0;
-    raceSeconds = Math.max(0, ((connection.local?.simulationTick ?? serverTick) - s.startTick) / 60);
+    elapsed = s.phase === 'shopping' && s.shopRound ? Math.max(0, (s.shopStartedTick - s.startTick) / 60) : s.phase === 'racing' || s.phase === 'results' ? Math.max(0, (serverTick - s.startTick) / 60) : 0;
+    raceSeconds = s.phase === 'shopping' ? elapsed : Math.max(0, ((connection.local?.simulationTick ?? serverTick) - s.startTick) / 60);
   }
-  if (view === 'race' && now - lastHud > 80) { lastHud = now; updateHud(now, players, localId, elapsed, countdown, raceSeconds); }
+  if (view === 'race' && now - lastHud > 80) { lastHud = now; updateShop(now); updateHud(now, players, localId, elapsed, countdown, raceSeconds); }
   const introElapsed = view === 'race' && countdown > COUNTDOWN_SECONDS
     ? Math.max(0, PRE_RACE_SECONDS - countdown) : undefined;
   const intro = document.querySelector<HTMLDivElement>('#race-intro')!;
@@ -304,7 +366,7 @@ function frame(now: number) {
     if (roster.innerHTML !== names) roster.innerHTML = names;
     intro.style.setProperty('--intro-progress', String(introElapsed / INTRO_SECONDS));
   }
-  if (practice && view === 'race') { controls.enabled = !modalKind && countdown === 0; if (countdown > 0) controls.clear(); }
+  if (practice && view === 'race') { controls.enabled = !practiceBuying && !modalKind && countdown === 0; if (countdown > 0) controls.clear(); }
   scene?.render(now, dt, players, localId, raceSeconds, introElapsed);
   nameContainer.hidden = view !== 'race' || !!modalKind;
   nameTags.update(view === 'race' ? players : [], id => scene?.birdMarker(id), localId);

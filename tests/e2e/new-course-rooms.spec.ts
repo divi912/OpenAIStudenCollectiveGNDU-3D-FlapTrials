@@ -31,7 +31,15 @@ test('private rooms synchronize all nine choices and start the final hard course
   await guest.getByRole('button', { name: 'Ready up', exact: true }).click();
   await host.getByRole('button', { name: 'Ready up', exact: true }).click();
   await host.getByRole('button', { name: 'Start the race' }).click();
-  for (const page of [host, guest]) await page.waitForFunction(() => (window as any).__flap.room?.phase === 'racing', undefined, { timeout: 20000 });
+  await host.getByRole('button', { name: 'Buy Crash Guard for 35 Flap Points' }).click();
+  await guest.waitForFunction(() => {
+    const f = (window as any).__flap;
+    return Object.values(f.room.players).some((p: any) => p.name === 'Host' && p.guardCharges === 1 && p.flapPoints === 65);
+  }, undefined, { polling: 50 });
+  await guest.getByRole('button', { name: 'Buy Overdrive for 50 Flap Points' }).click();
+  // The shared deadline may already have closed the shop on a slow renderer.
+  for (const page of [host, guest]) await page.locator('[data-action=shop-done]').evaluateAll(buttons => buttons.forEach(button => (button as HTMLButtonElement).click()));
+  for (const page of [host, guest]) await page.waitForFunction(() => (window as any).__flap.room?.phase === 'racing', undefined, { timeout: 20000, polling: 50 });
   const states = await Promise.all([host, guest].map(page => page.evaluate(() => ({ room: (window as any).__flap.room, stats: (window as any).__flap.stats }))));
   expect(states[0].room.startTick).toBe(states[1].room.startTick);
   for (const state of states) {

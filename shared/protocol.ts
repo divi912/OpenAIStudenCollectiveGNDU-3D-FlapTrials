@@ -1,13 +1,14 @@
-export const PROTOCOL_VERSION = 4;
-export const PHYSICS_VERSION = 'flight-3d-4';
+import type { ShopState } from './shop';
+export const PROTOCOL_VERSION = 5;
+export const PHYSICS_VERSION = 'flight-3d-5';
 export const TICK_RATE = 60;
 export const DT = 1 / TICK_RATE;
 export const COLORS = ['#ffcc42', '#55bce7', '#ee6865', '#77c875', '#b58ae0', '#f4a36d', '#65cbb6', '#f28eae'] as const;
 export type Vec3 = [number, number, number];
 export type RacerStatus = 'racing' | 'crashed' | 'finished' | 'dnf';
-export type RoomPhase = 'lobby' | 'loading' | 'countdown' | 'racing' | 'results';
+export type RoomPhase = 'lobby' | 'loading' | 'shopping' | 'countdown' | 'racing' | 'results';
 export interface InputFrame { sequence: number; tick: number; steer: -1 | 0 | 1; flapPressed: boolean; diveHeld: boolean; boostHeld?: boolean; pitch?: -1 | 0 | 1; roll?: -1 | 0 | 1 }
-export interface RacerState {
+export interface RacerState extends ShopState {
   playerId: string; x: number; y: number; z: number; vx: number; vy: number; speed: number;
   checkpointIndex: number; sectionProgress: number; crashCount: number; status: RacerStatus;
   nextFlapTick: number; respawnTick: number; finishTick: number; finishFraction: number;
@@ -23,7 +24,7 @@ export interface PlayerSnapshot extends RacerState { name: string; color: string
 export interface RoomSnapshot {
   roomId: string; code: string; raceId: number; phase: RoomPhase; hostId: string; isPublic: boolean;
   courseId: string; courseHash: string; physicsVersion: string; protocolVersion: number;
-  tick: number; startTick: number; deadline: number; players: Record<string, PlayerSnapshot>;
+  tick: number; startTick: number; deadline: number; shopRound: number; shopStartedTick: number; players: Record<string, PlayerSnapshot>;
 }
 export interface Box { center: Vec3; half: Vec3; angle?: number }
 export type ApertureShape = 'circle' | 'oval' | 'triangle' | 'diamond' | 'hexagon' | 'rectangle';

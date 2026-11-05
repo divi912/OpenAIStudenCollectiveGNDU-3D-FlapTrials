@@ -21,6 +21,7 @@ test('practice accepts one flap per press and restart clears state', async ({ pa
   await page.goto('/?webgl=1');
   await expect(page.locator('body')).toHaveAttribute('data-renderer', 'WebGL2', { timeout: 45000 });
   await page.getByRole('button', { name: 'Practice' }).click();
+  await page.getByRole('button', { name: 'Ready to race', exact: true }).click();
   await page.waitForFunction(() => (window as any).__flap.practice?.z > 1, undefined, { timeout: 15000 });
   const held = await page.evaluate(async () => {
     const inputPath = '/client/game/input.ts'; const { Controls } = await import(inputPath);
@@ -67,6 +68,10 @@ test('two browsers start the same race even when a guest joins before its models
   await expect(b.locator('#loading-feedback')).toContainText('Loading birds and stadium');
   expect(await b.evaluate(() => (window as any).__flap.renderer)).toBeUndefined();
   releaseModels();
+  for (const page of [a, b]) {
+    await page.waitForFunction(() => ['shopping', 'countdown', 'racing'].includes((window as any).__flap.room?.phase), undefined, { polling: 50 });
+    await page.locator('[data-action=shop-done]').evaluateAll(buttons => buttons.forEach(button => (button as HTMLButtonElement).click()));
+  }
   for (const page of [a, b]) await page.waitForFunction(() => (window as any).__flap.room?.phase === 'racing', { timeout: 15000 });
   await expect(a.locator('#loading-feedback')).toBeHidden();
   await a.waitForFunction(() => (window as any).__flap.network.sentInputs > 0);
@@ -96,6 +101,7 @@ test('a practice race announces and applies its first shared party event', async
   await page.goto('/?webgl=1');
   await expect(page.locator('body')).toHaveAttribute('data-renderer', 'WebGL2', { timeout: 45000 });
   await page.getByRole('button', { name: 'Practice' }).click();
+  await page.getByRole('button', { name: 'Ready to race', exact: true }).click();
   await expect(page.locator('#party-event')).toBeVisible({ timeout: 23000 });
   await expect(page.locator('#party-event')).toContainText('TAILWIND');
   await expect(page.locator('#party-event')).not.toHaveClass(/warning/, { timeout: 6000 });
@@ -107,6 +113,7 @@ test('pitch and roll keys change real flight state and cockpit panels remain ali
   await page.goto('/?webgl=1');
   await expect(page.locator('body')).toHaveAttribute('data-renderer', 'WebGL2', { timeout: 45000 });
   await page.getByRole('button', { name: 'Practice' }).click();
+  await page.getByRole('button', { name: 'Ready to race', exact: true }).click();
   for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 720 }]) {
     await page.setViewportSize(viewport);
     const top = await page.locator('.cockpit-top>.flight-card').evaluateAll(nodes => nodes.map(el => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; }));
@@ -122,6 +129,7 @@ test('pitch and roll keys change real flight state and cockpit panels remain ali
   }
   // Layout work can outlast an unattended flight. Start a fresh attempt for control checks.
   await page.keyboard.press('KeyR');
+  await page.getByRole('button', { name: 'Ready to race', exact: true }).click();
   await page.waitForFunction(() => (window as any).__flap.practice?.z > 1, { timeout: 10000 });
   await page.keyboard.down('KeyQ');
   await page.waitForFunction(() => (window as any).__flap.practice.roll > .6, { timeout: 3000 });
@@ -142,6 +150,7 @@ test('the in-game reduced-motion preference suppresses comic stamp animation', a
   await expect(page.locator('body')).toHaveAttribute('data-reduced-motion', 'true');
   await page.getByRole('button', { name: 'Done' }).click();
   await page.getByRole('button', { name: 'Practice' }).click();
+  await page.getByRole('button', { name: 'Ready to race', exact: true }).click();
   await expect(page.locator('.comic-stamp')).toBeVisible({ timeout: 12000 });
   // The short-lived cue can be replaced between reads; poll a fresh locator and style together.
   await expect(page.locator('.comic-stamp')).toHaveCSS('animation-name', 'none');

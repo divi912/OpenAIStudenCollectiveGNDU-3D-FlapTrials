@@ -13,6 +13,7 @@ test('all nine worlds render and survive switching between tiers', async ({ page
   for (const course of COURSES) {
     await page.locator(`.course-card[data-course="${course.id}"]`).click();
     await page.getByRole('button', { name: 'Practice' }).click();
+    await page.getByRole('button', { name: 'Ready to race', exact: true }).click();
     await page.clock.runFor(50);
     await expect(page.locator('#intro-course')).toHaveText(course.name);
     await page.clock.fastForward(9300);

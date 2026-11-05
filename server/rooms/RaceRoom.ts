@@ -59,6 +59,8 @@ export class RaceRoom extends Room<{ state: RaceSchema; input: FlightInput }> {
         case 'start': if (!this.model.start(client.sessionId)) client.send('notice', 'At least two birds must be ready.'); break;
         case 'loaded': this.model.loaded(client.sessionId, action.hash!, action.raceId!); break;
         case 'again': this.model.again(client.sessionId); break;
+        case 'buy': if (!this.model.buy(client.sessionId, action.value as string)) client.send('notice', 'Purchase unavailable.'); break;
+        case 'shop-done': this.model.finishBuying(client.sessionId); break;
       }
       this.publishPhase();
     });
@@ -82,7 +84,7 @@ export class RaceRoom extends Room<{ state: RaceSchema; input: FlightInput }> {
   onJoin(client: Client, options: { name?: unknown; color?: unknown }): void { this.lastActivity = Date.now(); this.model.join(client.sessionId, options); }
   async onDrop(client: Client): Promise<void> {
     const p = this.state.players.get(client.sessionId); if (!p) return;
-    if (this.state.phase !== 'racing') return;
+    if (this.state.phase !== 'racing' && !(this.state.phase === 'shopping' && this.state.shopRound)) return;
     p.connected = false;
     try { await this.allowReconnection(client, 10); p.connected = true; }
     catch { if (p.status !== 'finished') p.status = 'dnf'; }
@@ -90,7 +92,7 @@ export class RaceRoom extends Room<{ state: RaceSchema; input: FlightInput }> {
   onLeave(client: Client): void {
     const p = this.state.players.get(client.sessionId); if (!p) return;
     this.actionBudget.forget(client.sessionId);
-    if (this.state.phase !== 'racing') this.model.remove(client.sessionId);
+    if (this.state.phase !== 'racing' && !(this.state.phase === 'shopping' && this.state.shopRound)) this.model.remove(client.sessionId);
     else {
       p.connected = false; if (p.status !== 'finished') p.status = 'dnf';
       if (this.state.hostId === client.sessionId) this.state.hostId = [...this.state.players.values()].find(v => v.connected)?.playerId ?? '';

@@ -41,7 +41,7 @@ The ink-and-boost update adds depth-tested world-space outlines to birds, gates 
 
 Track decks are indexed ribbons with shared chunk endpoints, replacing overlapping boxes. The visible top still matches the collision floor. Balloon pavilions have one hull, stands sit clear of landmarks, center braces are upright, end flags mirror, and directional motifs mirror across their local center. Geometry tests cover all nine courses in multiple curved sections.
 
-Stored boost uses the rules in README and shared physics. Client/server protocol 4 is required. A complete boost tank lasts 4 seconds; actual human balance needs playtesting. All nine legal-input completion tests still pass without needing boost.
+Stored boost uses the rules in README and shared physics. Client/server protocol 5 is required. A complete boost tank lasts 4 seconds; actual human balance needs playtesting. All nine legal-input completion tests still pass without needing boost.
 
 ## Floating HUD and anti-aliasing
 
@@ -50,3 +50,5 @@ Race panels have no visible containers. Fredoka text and dark text strokes prese
 High quality renders at1.5× CSS resolution (bounded to2880×1800), requests up to8× MSAA where supported, and applies FXAA after resolving the scene. Adaptive starts at1.25× and4× MSAA, retaining the existing dynamic-resolution response. Low omits the extra post-process. Sample counts are capped by the device; sustained performance varies by GPU.
 
 The room browser check covers joining, all nine host choices and synchronized race start. `npx tsx scripts/check-boost-room.ts` independently checks boost activation, spending and release received by a second client; set `SERVER_URL` for a deployed backend.
+
+The Flap Shop uses the same Fredoka typography, with floating item icons and a short description for each purchase. Racing keeps a small FP count and equipped-item names; the complete shop appears only during the two shared buy phases.

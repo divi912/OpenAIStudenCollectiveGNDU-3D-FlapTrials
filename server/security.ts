@@ -29,12 +29,14 @@ export function allowedOrigin(origin: string | undefined, configured: string): b
   return !origin || configured === '*' || origin === configured;
 }
 
-export interface RoomAction { type: 'ready' | 'map' | 'start' | 'loaded' | 'again'; value?: unknown; raceId?: number; hash?: string }
+export interface RoomAction { type: 'ready' | 'map' | 'start' | 'loaded' | 'again' | 'buy' | 'shop-done'; value?: unknown; raceId?: number; hash?: string }
 export function validAction(value: unknown, raceId: number): value is RoomAction {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const a = value as RoomAction;
   if (a.raceId !== undefined && a.raceId !== raceId) return false;
   switch (a.type) {
+    case 'buy': return a.raceId === raceId && typeof a.value === 'string' && a.value.length <= 32;
+    case 'shop-done': return a.raceId === raceId;
     case 'ready': return typeof a.value === 'boolean';
     case 'map': return typeof a.value === 'string' && a.value.length <= 64;
     case 'loaded': return typeof a.hash === 'string' && /^[a-f0-9]{8}$/.test(a.hash) && a.raceId === raceId;

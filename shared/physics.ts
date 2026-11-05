@@ -1,3 +1,4 @@
+import { shopDefaults, hasItem } from './shop';
 import { crossingFraction, sweepSphereMovingBox } from './collision';
 import { apertureClearance, isGate, obstacleBoxes, obstacleBoxAt, obstaclePose } from './courses';
 import { DT, type CompiledCourse, type InputFrame, type RacerState, type Vec3 } from './protocol';
@@ -11,7 +12,7 @@ export const BOOST = Object.freeze({ capacity: 100, initial: 60, speedBonus: 6, 
   regenDelayTicks: 90, activationMinimum: 15, gateReward: 6, pickupReward: 25, crashCost: 25, maxSpeed: 30 });
 export function idleInput(): InputFrame { return { sequence: 0, tick: 0, steer: 0, flapPressed: false, diveHeld: false, boostHeld: false, pitch: 0, roll: 0 }; }
 export function createRacer(playerId: string): RacerState {
-  return { playerId, x: 0, y: 6, z: 0, vx: 0, vy: 0, speed: 16, checkpointIndex: 0, sectionProgress: 0,
+  return { ...shopDefaults(), playerId, x: 0, y: 6, z: 0, vx: 0, vy: 0, speed: 16, checkpointIndex: 0, sectionProgress: 0,
     crashCount: 0, status: 'racing', nextFlapTick: 0, respawnTick: 0, finishTick: -1, finishFraction: 0, lastProcessedSequence: -1, simulationTick: -1, crashCause: '', boostUntilTick: 0, shieldUntilTick: 0, pickupMask: 0,
     boostReserve: BOOST.initial, boostCooldownUntilTick: 0, boostActive: false, boostRewardZ: -1,
     heading: 0, pitch: 0, roll: 0, rollTravel: 0, trickCount: 0, gatesCleared: 0, cleanStreak: 0, bestStreak: 0, styleScore: 0 };
@@ -24,15 +25,15 @@ export function respawnRacer(s: RacerState, course: CompiledCourse): void {
   s.boostActive = false;
 }
 function crash(s: RacerState, tick: number, cause: string): void {
-  s.status = 'crashed'; s.crashCount++; s.respawnTick = tick + PHYSICS.respawnTicks; s.crashCause = cause;
+  s.status = 'crashed'; s.crashCount++; s.respawnTick = tick + PHYSICS.respawnTicks + (hasItem(s, 'overdrive') ? 18 : 0); s.crashCause = cause;
   s.boostUntilTick = 0; s.shieldUntilTick = 0;
-  s.boostReserve = Math.max(0, s.boostReserve - BOOST.crashCost); s.boostActive = false;
+  s.boostReserve = Math.max(0, s.boostReserve - BOOST.crashCost - (hasItem(s, 'overdrive') ? 20 : 0)); s.boostActive = false;
   s.boostCooldownUntilTick = tick + BOOST.regenDelayTicks;
   s.cleanStreak = 0; s.rollTravel = 0;
 }
 export function stepRacer(s: RacerState, input: InputFrame, course: CompiledCourse, tick: number, raceStartTick = 0): void {
   s.simulationTick = tick;
-  if (s.status === 'finished' || s.status === 'dnf') return;
+  if (s.shopUntilTick || s.status === 'finished' || s.status === 'dnf') { s.boostActive = false; return; }
   s.lastProcessedSequence = Math.max(s.lastProcessedSequence, input.sequence);
   if (s.status === 'crashed') { if (tick >= s.respawnTick) { respawnRacer(s, course); s.nextFlapTick = tick; } return; }
   const from: Vec3 = [s.x, s.y, s.z];
@@ -45,14 +46,15 @@ export function stepRacer(s: RacerState, input: InputFrame, course: CompiledCour
   if (Math.abs(s.rollTravel) >= Math.PI * 2) { s.rollTravel -= Math.sign(s.rollTravel) * Math.PI * 2; s.trickCount++; s.styleScore += 200; }
   const seconds = (tick - raceStartTick) * DT, event = partyEvent(seconds);
   const chaos = event.warning ? 'calm' : event.kind;
-  const shielded = tick < s.shieldUntilTick;
-  s.boostActive = input.boostHeld === true && s.boostReserve > 1e-9 && (s.boostActive || s.boostReserve >= BOOST.activationMinimum);
+  const shielded = tick < s.shieldUntilTick || s.guardCharges > 0;
+  let guardHit = false;
+  s.boostActive = tick >= s.jammedUntilTick && input.boostHeld === true && s.boostReserve > 1e-9 && (s.boostActive || s.boostReserve >= BOOST.activationMinimum);
   if (s.boostActive) {
     s.boostReserve = Math.max(0, s.boostReserve - BOOST.drainPerSecond * DT);
     if (s.boostReserve < 1e-9) s.boostReserve = 0;
     s.boostCooldownUntilTick = tick + BOOST.regenDelayTicks;
-  } else if (tick >= s.boostCooldownUntilTick) s.boostReserve = Math.min(BOOST.capacity, s.boostReserve + BOOST.regenPerSecond * DT);
-  const targetSpeed = Math.min(BOOST.maxSpeed, (input.diveHeld ? PHYSICS.maxSpeed : PHYSICS.baseSpeed) + (chaos === 'turbo' ? 6 : 0) + (s.boostActive ? BOOST.speedBonus : 0));
+  } else if (tick >= s.boostCooldownUntilTick) s.boostReserve = Math.min(BOOST.capacity, s.boostReserve + BOOST.regenPerSecond * (hasItem(s, 'capacitor') ? 1.5 : 1) * DT);
+  const targetSpeed = Math.min(BOOST.maxSpeed, (input.diveHeld ? PHYSICS.maxSpeed : PHYSICS.baseSpeed) + (chaos === 'turbo' ? 6 : 0) + (s.boostActive ? BOOST.speedBonus : 0) + (hasItem(s, 'overdrive') ? 2 : 0));
   if (input.flapPressed && tick >= s.nextFlapTick) {
     s.vy = Math.min(PHYSICS.maxClimb, s.vy + PHYSICS.flapImpulse * (.45 + .55 * Math.cos(bodyRoll(s.heading, s.roll))) * Math.cos(s.pitch));
     s.vx -= Math.sin(bodyRoll(s.heading, s.roll)) * PHYSICS.flapImpulse * .15;
@@ -84,10 +86,10 @@ export function stepRacer(s: RacerState, input: InputFrame, course: CompiledCour
     const moving = o.kind === 'shutter' || o.kind === 'rotating_gate';
     const boxes = obstacleBoxes(o, seconds);
     const bound = moving ? (Math.PI * 2 / o.period * (o.kind === 'shutter' ? o.amplitude : Math.hypot(o.width / 2 + 3, o.height / 2 + 3))) * DT : 0;
-    for (let i = 0; i < boxes.length && !shielded; i++) {
+    for (let i = 0; i < boxes.length && tick >= s.shieldUntilTick; i++) {
       for (const probe of probes) {
         const fraction = sweepSphereMovingBox(probe.from, probe.to, probe.radius + (probe.radius < PHYSICS.radius ? .002 : 0), moving ? t => obstacleBoxAt(o, seconds + t * DT, i) : () => boxes[i], bound + angularTravel);
-        if (fraction !== null) impact = Math.min(impact, fraction);
+        if (fraction !== null) { if (s.guardCharges) guardHit = true; else impact = Math.min(impact, fraction); }
       }
     }
     const crossing = crossingFraction(from[2], to[2], o.z);
@@ -105,6 +107,7 @@ export function stepRacer(s: RacerState, input: InputFrame, course: CompiledCour
       }
     }
   }
+  if (guardHit) { s.guardCharges = 0; s.shieldUntilTick = tick + 60; }
   const d = course.definition;
   for (const [a, b, plane, positive] of [[from[0], to[0], d.width / 2 - PHYSICS.radius, true], [from[0], to[0], -d.width / 2 + PHYSICS.radius, false], [from[1], to[1], d.ceiling - PHYSICS.radius, true], [from[1], to[1], d.floor + PHYSICS.radius, false]] as const) {
     if (positive ? b > plane : b < plane) { const hit = Math.max(0, (plane - a) / (b - a)); if (hit < impact) { impact = hit; crashCause = 'bounds'; } }

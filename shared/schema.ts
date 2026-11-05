@@ -7,7 +7,7 @@ export class FlightInput extends Schema {
 }
 defineTypes(FlightInput, { sequence: 'uint32', tick: 'uint32', steer: 'int8', flapPressed: 'boolean', diveHeld: 'boolean', boostHeld: 'boolean', raceId: 'uint32', pitch: 'int8', roll: 'int8' });
 
-export const SIM_FIELDS = ['playerId', 'x', 'y', 'z', 'vx', 'vy', 'speed', 'checkpointIndex', 'sectionProgress', 'crashCount', 'status', 'nextFlapTick', 'respawnTick', 'finishTick', 'finishFraction', 'lastProcessedSequence', 'simulationTick', 'crashCause', 'boostUntilTick', 'shieldUntilTick', 'pickupMask', 'boostReserve', 'boostCooldownUntilTick', 'boostActive', 'boostRewardZ', 'heading', 'pitch', 'roll', 'rollTravel', 'trickCount', 'gatesCleared', 'cleanStreak', 'bestStreak', 'styleScore'] as const;
+export const SIM_FIELDS = ['playerId', 'x', 'y', 'z', 'vx', 'vy', 'speed', 'checkpointIndex', 'sectionProgress', 'crashCount', 'status', 'nextFlapTick', 'respawnTick', 'finishTick', 'finishFraction', 'lastProcessedSequence', 'simulationTick', 'crashCause', 'boostUntilTick', 'shieldUntilTick', 'pickupMask', 'boostReserve', 'boostCooldownUntilTick', 'boostActive', 'boostRewardZ', 'heading', 'pitch', 'roll', 'rollTravel', 'trickCount', 'gatesCleared', 'cleanStreak', 'bestStreak', 'styleScore', 'flapPoints', 'boughtMask', 'loadoutMask', 'guardCharges', 'jammerCharges', 'shopUntilTick', 'shopReady', 'midShopVisited', 'jammedUntilTick', 'jamImmuneUntilTick'] as const;
 export class PlayerSchema extends Schema implements RacerState {
   playerId = ''; x = 0; y = 6; z = 0; vx = 0; vy = 0; speed = 16;
   checkpointIndex = 0; sectionProgress = 0; crashCount = 0; status: RacerStatus = 'racing';
@@ -17,6 +17,8 @@ export class PlayerSchema extends Schema implements RacerState {
   boostReserve = BOOST.initial; boostCooldownUntilTick = 0; boostActive = false; boostRewardZ = -1;
   heading = 0; pitch = 0; roll = 0; rollTravel = 0; trickCount = 0;
   gatesCleared = 0; cleanStreak = 0; bestStreak = 0; styleScore = 0;
+  flapPoints = 100; boughtMask = 0; loadoutMask = 0; guardCharges = 0; jammerCharges = 0;
+  shopUntilTick = 0; shopReady = false; midShopVisited = false; jammedUntilTick = 0; jamImmuneUntilTick = 0;
   name = 'Little Bird'; color = '#ffcc42'; ready = false; loaded = false; connected = true;
   reset() { Object.assign(this, createRacer(this.playerId)); this.ready = false; this.loaded = false; }
 }
@@ -25,6 +27,8 @@ defineTypes(PlayerSchema, {
   checkpointIndex: 'uint8', sectionProgress: 'float64', crashCount: 'uint16', status: 'string',
   nextFlapTick: 'float64', respawnTick: 'float64', finishTick: 'float64', finishFraction: 'float64', lastProcessedSequence: 'float64', simulationTick: 'float64',
   name: 'string', color: 'string', ready: 'boolean', loaded: 'boolean', connected: 'boolean',
+  flapPoints: 'uint16', boughtMask: 'uint8', loadoutMask: 'uint8', guardCharges: 'uint8', jammerCharges: 'uint8',
+  shopUntilTick: 'float64', shopReady: 'boolean', midShopVisited: 'boolean', jammedUntilTick: 'float64', jamImmuneUntilTick: 'float64',
   crashCause: 'string',
   boostUntilTick: 'float64', shieldUntilTick: 'float64', pickupMask: 'uint32',
   boostReserve: 'float64', boostCooldownUntilTick: 'float64', boostActive: 'boolean', boostRewardZ: 'float64',
@@ -33,10 +37,10 @@ defineTypes(PlayerSchema, {
 export class RaceSchema extends Schema {
   code = ''; raceId = 1; phase: RoomPhase = 'lobby'; hostId = ''; isPublic = false;
   courseId = 'skyline_sprint'; courseHash = ''; physicsVersion = PHYSICS_VERSION; protocolVersion = PROTOCOL_VERSION;
-  tick = 0; startTick = 0; deadline = 0; players = new MapSchema<PlayerSchema>();
+  tick = 0; startTick = 0; deadline = 0; shopRound = 0; shopStartedTick = 0; players = new MapSchema<PlayerSchema>();
 }
 defineTypes(RaceSchema, {
   code: 'string', raceId: 'uint32', phase: 'string', hostId: 'string', isPublic: 'boolean',
   courseId: 'string', courseHash: 'string', physicsVersion: 'string', protocolVersion: 'uint8',
-  tick: 'float64', startTick: 'float64', deadline: 'float64', players: { map: PlayerSchema },
+  tick: 'float64', startTick: 'float64', deadline: 'float64', shopRound: 'uint8', shopStartedTick: 'float64', players: { map: PlayerSchema },
 });

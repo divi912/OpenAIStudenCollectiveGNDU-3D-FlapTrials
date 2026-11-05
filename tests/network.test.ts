@@ -27,7 +27,7 @@ it('keeps authority, reconnects the same racer and retains a voluntary quitter a
   const b = await client.joinById<RaceSchema>(a.roomId, options, RaceSchema); rooms.push(b);
   for (const room of [a, b]) {
     room.onMessage('notice', () => {});
-    room.onStateChange(s => { if (s.phase === 'loading') room.send('action', { type: 'loaded', hash: s.courseHash, raceId: s.raceId }); });
+    room.onStateChange(s => { if (s.phase === 'loading') room.send('action', { type: 'loaded', hash: s.courseHash, raceId: s.raceId }); if (s.phase === 'shopping' && !s.players.get(room.sessionId)?.shopReady) room.send('action', { type: 'shop-done', raceId: s.raceId }); });
   }
   await until(() => a.state.players.size === 2 && b.state.players.size === 2);
   a.send('action', { type: 'ready', value: true }); b.send('action', { type: 'ready', value: true });

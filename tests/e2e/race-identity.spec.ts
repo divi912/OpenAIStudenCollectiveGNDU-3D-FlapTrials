@@ -7,6 +7,7 @@ test('Skyline keeps its compact HUD while keyboard flight clears the first secti
   await page.goto('/?webgl=1');
   await expect(page.locator('body')).toHaveAttribute('data-renderer', 'WebGL2', { timeout: 45000 });
   await page.getByRole('button', { name: 'Practice' }).click();
+  await page.getByRole('button', { name: 'Ready to race', exact: true }).click();
   await page.waitForFunction(() => document.body.dataset.intro === 'false');
   await expect(page.locator('.cockpit-flock')).toBeHidden();
   await expect(page.locator('.flight-bindings,.panel-footnote')).toHaveCount(0);

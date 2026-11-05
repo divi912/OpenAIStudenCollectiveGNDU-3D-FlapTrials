@@ -19,6 +19,8 @@ describe('authoritative room lifecycle', () => {
     s.loaded('a', getCourse('skyline_sprint').hash, s.state.raceId);
     s.loaded('b', getCourse('skyline_sprint').hash, s.state.raceId);
     s.step(1, new Map());
+    expect(s.state.phase).toBe('shopping');
+    s.finishBuying('a'); s.finishBuying('b'); s.step(2, new Map());
     expect(s.state.phase).toBe('countdown');
     s.step(s.state.startTick, new Map());
     expect(s.state.phase).toBe('racing');
