@@ -33,3 +33,19 @@ Landmarks include ring plazas, balloon pavilions, pinwheels, spools, cog towers,
 ## Verification
 
 Unit/integration tests cover all-nine progression, hashes, collision geometry and legal-input completion. Browser checks cover all-nine rendering and switching, tier selection at320px through desktop, touch rotation, saved quality/motion settings, delayed model startup in two clients, and a shared room selecting all nine courses before starting Crown Circuit. Screenshots in`.cache` come from the actual renderer. Automated rendering checks are not sustained hardware performance benchmarks.
+
+
+## Comic outlines and geometry repair
+
+The local ink-and-boost pass adds depth-tested world-space outlines to birds, gates and major solid scenery. It keeps the existing instanced Babylon rendering and supplies equivalent GLSL/WGSL outline math for nonuniform transforms. Low quality disables landmark ink; birds and gameplay gates retain it. Clouds, shields and tiny crowd parts do not gain another outline pass. PBR surfaces now use a more matte response.
+
+Track decks are indexed ribbons with shared chunk endpoints, replacing overlapping boxes. The visible top still matches the collision floor. Balloon pavilions have one hull, stands sit clear of landmarks, center braces are upright, end flags mirror, and directional motifs mirror across their local center. Geometry tests cover all nine courses in multiple curved sections.
+
+Stored boost uses the rules in README and shared physics. Client/server protocol4 is required. A complete boost tank lasts4 seconds; actual human balance needs playtesting. All nine legal-input completion tests still pass without needing boost. This local pass is not yet published.
+
+
+## Floating HUD and anti-aliasing
+
+Race panels have no visible containers. Fredoka text and dark text strokes preserve contrast over the world, with permanent practice/place/checkpoint labels removed. Only the course, timer, place, boost and progress remain; event text appears only during an event. Touch controls also use floating glyphs with pressed-color feedback.
+
+High quality renders at1.5× CSS resolution (bounded to2880×1800), requests up to8× MSAA where supported, and applies FXAA after resolving the scene. Adaptive starts at1.25× and4× MSAA, retaining the existing dynamic-resolution response. Low omits the extra post-process. Sample counts are capped by the device; sustained performance varies by GPU.

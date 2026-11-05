@@ -70,3 +70,36 @@ body[data-touch=true] .touch-controls .touch-flap{background:#ff51a7;color:#fff}
 body[data-touch=true] .touch-controls button.pressed{background:#ffe05b;color:#493670}
 body[data-touch=true] .touch-pad-label{background:#faf7ffd9;color:#7451d5}
 @media(max-height:500px) and (orientation:landscape){.race-playground .cockpit-top>.flight-card{height:49px;padding:7px 12px}.race-playground .course-panel h2{font-size:16px}.race-playground .course-panel p{font-size:7px}.race-playground .clock-panel strong{font-size:23px}.race-playground .party-event{top:77px;width:210px;padding:6px}.race-playground .party-event>strong{font-size:16px}.race-playground .cockpit-flock{display:none}body[data-touch=true] .race-playground .cockpit-bottom{bottom:12px;width:190px;max-width:28vw}body[data-touch=true] .race-playground .gate-guidance{bottom:85px}body[data-touch=true] .race-playground .power-status{bottom:130px;right:12px}}
+
+.boost-reserve{position:absolute;left:24px;bottom:24px;width:180px;padding:12px 14px;border:2px solid #fff;border-radius:16px;background:#faf7fff2;box-shadow:0 4px 0 #52409522;color:#483666}
+.boost-heading{display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:850}.boost-heading kbd{font-size:10px;background:#e8e0fa;border-radius:4px;padding:2px 5px;margin-left:6px}.boost-track{height:9px;border-radius:6px;background:#e8e0fa;overflow:hidden;margin-top:8px}.boost-track i{display:block;height:100%;background:#edb62f;border-radius:6px}.boost-reserve>small{display:block;font-size:9px;margin-top:6px;color:#77658b}.boost-reserve.active{background:#ffe581}.boost-reserve.active .boost-track i{background:#a46a14}
+body[data-touch=true] .boost-heading kbd{display:none}
+@media(max-width:700px){.boost-reserve{left:10px;bottom:95px;width:140px;padding:9px 11px}.race-playground .power-status{bottom:195px}}
+body[data-touch=true] .boost-reserve{left:10px;bottom:calc(170px + env(safe-area-inset-bottom));width:112px}.touch-boost{background:#edb62fee!important;color:#302253!important}
+@media(max-width:450px){body[data-touch=true] .race-playground .cockpit-bottom{left:auto;right:10px;transform:none;width:145px;max-width:45vw}}
+@media(max-height:500px) and (orientation:landscape){body[data-touch=true] .boost-reserve{left:170px;bottom:12px;width:130px;padding:7px 10px}.boost-reserve>small{display:none}}
+
+@media(max-width:450px){.touch-actions{gap:6px}.touch-flap-row{display:grid;grid-template-columns:44px 60px;gap:5px}.touch-flap-row .touch-boost{grid-column:1/-1;width:109px;min-height:34px}.touch-flap-row .touch-flap{width:60px;height:60px}.touch-flap-row button{width:44px}.touch-roll button{width:52px}.touch-pad{grid-template-columns:repeat(3,40px);grid-template-rows:repeat(3,40px)}.touch-pad button{min-width:40px;min-height:40px}}
+
+/* Floating comic HUD. Panels retain layout/accessibility, without visible containers. */
+.race-playground{font-family:Fredoka,'Comic Sans MS',cursive;color:#fff;text-shadow:1px 2px 0 #211e35,-1px -1px 0 #211e35,1px -1px 0 #211e35,-1px 1px 0 #211e35}
+.race-playground .flight-card,.race-playground .cockpit-top>.flight-card,.race-playground .cockpit-bottom>.navigation-panel,.race-playground .boost-reserve,.race-playground .boost-reserve.active,.race-playground .gate-guidance,.race-playground.party-active .gate-guidance,.race-playground .party-event,.race-playground .party-event.warning,.race-playground .power-status>span,.race-playground .rival,.race-playground .rival.local,.race-playground .cockpit-menu{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;backdrop-filter:none!important}
+.race-playground .course-panel h2{color:#fff;font-weight:700;font-size:27px}
+.race-playground .course-panel p,.race-playground .clock-panel>.instrument-label,.race-playground .position-panel .instrument-label,.race-playground .navigation-title>.instrument-label,.race-playground .party-event>small{display:none!important}
+.race-playground .clock-panel strong{font:700 34px Fredoka,sans-serif;color:#fff;letter-spacing:.5px}
+.race-playground .position-panel>div>strong{font:700 36px Fredoka,sans-serif;color:#ffe05b}
+.race-playground .position-panel strong>small{color:#fff;font-size:19px}
+.race-playground .cockpit-menu{color:#fff;filter:drop-shadow(1px 2px 0 #211e35)}
+.race-playground .navigation-title{justify-content:center}.race-playground .navigation-title>strong{font:650 17px Fredoka,sans-serif;color:#fff}
+.race-playground .progress-track{background:#211e354d;height:5px;box-shadow:0 1px 0 #211e35}
+.race-playground #course-progress{background:#ffe05b}
+.race-playground .boost-heading{font:650 18px Fredoka,sans-serif;color:#ffe05b}.race-playground .boost-heading kbd{font:600 12px Fredoka,sans-serif;background:transparent;border:0;color:#fff;box-shadow:none}
+.race-playground .boost-track{height:7px;background:#211e354d}.race-playground .boost-track i{background:#ffe05b}.race-playground .boost-reserve>small{font:500 12px Fredoka,sans-serif;color:white}
+.race-playground .gate-guidance:before{display:none}.race-playground .gate-guidance>small,.race-playground .gate-guidance>strong{color:#fff;font:600 17px Fredoka,sans-serif}
+.race-playground .party-event>strong{color:#ffe05b;font:700 27px Fredoka,sans-serif}.race-playground .party-event i{background:transparent;color:#fff;font-size:22px}
+.race-playground .power-status>span{font:650 17px Fredoka,sans-serif;color:#72e5ef!important}
+.race-playground .center-cue>span,.race-playground .comic-stamp>small{background:transparent!important;border:0!important;box-shadow:none!important;color:#fff;font-family:Fredoka,sans-serif}
+body[data-view=race] .bird-nametag,body[data-view=race] .bird-nametag.local{background:transparent;border:0;box-shadow:none;border-radius:0;font-family:Fredoka,sans-serif;color:#fff;text-shadow:1px 2px 0 #211e35,-1px -1px 0 #211e35}
+body[data-touch=true] .touch-controls button,body[data-touch=true] .touch-controls .touch-flap,body[data-touch=true] .touch-controls .touch-boost,body[data-touch=true] .touch-pad-label{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important;font-family:Fredoka,sans-serif;color:#fff!important;text-shadow:1px 2px 0 #211e35,-1px -1px 0 #211e35}
+body[data-touch=true] .touch-controls button.pressed{color:#ffe05b!important;transform:scale(.94)}
+@media(max-width:600px){.race-playground .course-panel h2{font-size:19px}.race-playground .clock-panel strong{font-size:23px}.race-playground .position-panel>div>strong{font-size:28px}.race-playground .party-event>strong{font-size:19px}.race-playground .boost-heading{font-size:15px}}

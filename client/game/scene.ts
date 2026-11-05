@@ -42,6 +42,7 @@ import { partyEvent } from '../../shared/party';
 import { frameAt, trackToWorld, bodyRoll } from '../../shared/track';
 import { introShot } from '../../shared/intro';
 import { flightCamera, smoothBank } from './flight-camera';
+import { inkMesh, inkKind } from './ink';
 
 interface BirdVisual { root: TransformNode; wings: TransformNode[]; beak?: TransformNode; material?: PBRMaterial; meshes: AbstractMesh[]; shield: InstancedMesh }
 interface ObstacleVisual { definition: ObstacleDefinition; root: TransformNode; gem?: InstancedMesh }
@@ -119,7 +120,7 @@ export class GameScene {
     this.camera.minZ = .15; this.camera.maxZ = 600; this.camera.fov = .68;
     this.camera.setTarget(new Vector3(0, 1, 0));
     this.fxaa = new FxaaPostProcess('smooth-flight-edges', 1, null, Texture.BILINEAR_SAMPLINGMODE, engine);
-    scene.environmentTexture = studioEnvironment(scene); scene.environmentIntensity = .45;
+    scene.environmentTexture = studioEnvironment(scene); scene.environmentIntensity = .3;
     this.contact = contactShadow(scene);
     const sky = new HemisphericLight('soft-sky', new Vector3(0, 1, 0), scene); sky.intensity = .72; sky.groundColor = c3('#647487');
     const sun = new DirectionalLight('sun', new Vector3(-.5, -.8, .6), scene); sun.intensity = 1.35; sun.diffuse = c3('#fff0cf');
@@ -163,8 +164,8 @@ export class GameScene {
     if (!mat) {
       mat = new StandardMaterial(key, this.scene); mat.diffuseColor = c3(color);
       mat.emissiveColor = c3(color).scale(.06);
-      mat.specularColor = shiny ? new Color3(.45, .45, .4) : Color3.Black(); mat.specularPower = shiny ? 48 : 8;
-      if (['#ffcf6d', '#8ce4ed', '#fff1cc', '#e0f7e8'].includes(color)) mat.emissiveColor = c3(color).scale(.65);
+      mat.specularColor = shiny ? new Color3(.24, .24, .22) : Color3.Black(); mat.specularPower = shiny ? 36 : 8;
+      if (['#ffcf6d', '#8ce4ed', '#fff1cc', '#e0f7e8'].includes(color)) mat.emissiveColor = c3(color).scale(.22);
       if (key.startsWith('#fff') && !shiny) mat.emissiveColor = c3(color).scale(.18);
       if (finish) {
         let maps = this.surfaces.get(finish);
@@ -180,8 +181,7 @@ export class GameScene {
     if (!material) {
       material = new PBRMaterial(`toy-plastic-${color}`, this.scene);
       material.albedoColor = c3(color).toLinearSpace(); material.metallic = 0;
-      material.roughness = .42; material.clearCoat.isEnabled = true;
-      material.clearCoat.intensity = .22; material.clearCoat.roughness = .3;
+      material.roughness = .66; material.clearCoat.isEnabled = false;
       this.toyMaterials.set(color, material);
     }
     return material;
@@ -224,6 +224,7 @@ export class GameScene {
         const bubble = new StandardMaterial('shield-bubble', this.scene); bubble.diffuseColor = c3(color); bubble.emissiveColor = c3(color).scale(.35); bubble.alpha = .16; bubble.specularPower = 100; bubble.backFaceCulling = true; mesh.material = bubble;
       }
       if (kind === 'water') { const water = this.mat(color, false); water.alpha = .6; water.emissiveColor = c3(color).scale(.18); }
+      if (inkKind(kind)) inkMesh(mesh, kind === 'toy-hoop' ? 'gate' : 'landmark', this.settings.quality === 'low');
       this.prototype.set(key, mesh);
     }
     return mesh;
@@ -251,6 +252,7 @@ export class GameScene {
       source = new Mesh(key, this.scene);
       gateShell(apertureVertices(o), o.kind === 'wall' ? .9 : .55, o.thickness).applyToMesh(source);
       source.material = toy ? this.toyMaterial(color) : this.mat(color, true, 'enamel'); source.isVisible = false; source.isPickable = false;
+      inkMesh(source, 'gate', this.settings.quality === 'low');
       this.prototype.set(key, source);
     }
     const frame = source.createInstance('bevelled-gate-frame'); frame.parent = parent; frame.isPickable = false;
@@ -263,8 +265,9 @@ export class GameScene {
     let material: PBRMaterial | undefined;
     for (const mesh of meshes) {
       mesh.isPickable = false;
+      if (mesh instanceof Mesh && mesh.getTotalVertices() > 0 && mesh.material && !mesh.material.needAlphaBlendingForMesh(mesh)) inkMesh(mesh, 'bird', this.settings.quality === 'low');
       if (mesh.material?.name === 'Body' || mesh.material?.name.endsWith('-Body')) {
-        material ??= (mesh.material as PBRMaterial).clone(`body-${id}`)!; material.albedoColor = c3(color).toLinearSpace(); material.roughness = .48; material.emissiveColor = material.albedoColor.scale(.04);
+        material ??= (mesh.material as PBRMaterial).clone(`body-${id}`)!; material.albedoColor = c3(color).toLinearSpace(); material.roughness = .68; material.emissiveColor = material.albedoColor.scale(.025);
         mesh.material = material;
       }
     }
@@ -302,12 +305,20 @@ export class GameScene {
     }
     this.menuRoot.rotation.y = -.1;
   }
-  setPreferences(settings: Preferences) { this.settings = settings; this.resize(); }
+  setPreferences(settings: Preferences) {
+    this.settings = settings;
+    for (const mesh of this.scene.meshes) if (mesh instanceof Mesh && mesh.metadata?.inkRole) inkMesh(mesh, mesh.metadata.inkRole, settings.quality === 'low');
+    this.resize();
+  }
   resize() {
     const w = this.canvas.clientWidth || innerWidth, h = this.canvas.clientHeight || innerHeight;
     const low = this.settings.quality === 'low';
-    const scale = Math.max(1, w / (low ? 1280 : 1920), h / (low ? 720 : 1080)) * (this.settings.quality === 'auto' ? this.resolution : 1);
+    // Render above CSS resolution, then resolve MSAA and apply FXAA to ink edges.
+    const target = low ? 1 : this.settings.quality === 'high' ? 1.5 : 1.25;
+    const density = Math.min(target, 2880 / w, 1800 / h);
+    const scale = Math.max(1 / density, w / 2880, h / 1800) * (this.settings.quality === 'auto' ? this.resolution : 1);
     this.engine.setHardwareScalingLevel(scale); this.engine.resize();
+    if (this.fxaa) this.fxaa.samples = low ? 1 : Math.min(this.engine.getCaps().maxMSAASamples || 1, this.settings.quality === 'high' ? 8 : 4);
     if (this.fxaa && this.fxaaAttached === low) {
       if (low) this.camera.detachPostProcess(this.fxaa); else this.camera.attachPostProcess(this.fxaa);
       this.fxaaAttached = !low;
@@ -331,8 +342,8 @@ export class GameScene {
     const fill = this.scene.getLightByName('soft-sky') as HemisphericLight;
     const toy = !!course.difficultyGroup || course.id === 'skyline_sprint';
     const look = playgroundLook(course);
-    this.scene.environmentIntensity = toy ? .55 : 0;
-    fill.intensity = toy ? 1.05 : .72; fill.groundColor = c3(toy ? '#abbce2' : '#647487');
+    this.scene.environmentIntensity = toy ? .34 : 0;
+    fill.intensity = toy ? .86 : .72; fill.groundColor = c3(toy ? '#8797bb' : '#647487');
     this.scene.getLightByName('sun')!.intensity = toy ? 1.12 : 1.35;
     this.mode = 'race'; this.menuRoot.setEnabled(false); this.canvas.classList.add('racing');
     if (this.course?.id !== course.id || !this.courseRoot) this.buildCourse(course);
@@ -482,7 +493,7 @@ export class GameScene {
         this.camera.position.copyFrom(this.follow); this.camera.setTarget(this.look);
         this.audience?.update(local.z, this.settings.quality === 'low', this.settings.quality === 'auto' && this.resolution > 1.15);
         for (const chunk of this.chunks) chunk.root.setEnabled(chunk.z > local.z - 200 && chunk.z < local.z + 330);
-        const boosted = local.simulationTick < local.boostUntilTick || local.speed > 23;
+        const boosted = local.boostActive || local.simulationTick < local.boostUntilTick || local.speed > 23;
         const baseFov = this.course?.difficultyGroup ? 68 : 75;
         const targetFov = (boosted && !this.settings.reducedMotion ? baseFov + 6 : baseFov) * Math.PI / 180;
         this.camera.fov += (targetFov - this.camera.fov) * (1 - Math.exp(-dt * 3));
@@ -518,7 +529,10 @@ export class GameScene {
         }
         bird.shield.setEnabled(!shot && p.shieldUntilTick > 0 && p.simulationTick < p.shieldUntilTick);
         const overlap = local && p.playerId !== localId && Math.abs(p.z - local.z) < 5 && Math.abs(p.x - local.x) < 1.4 && Math.abs(p.y - local.y) < 1.4;
-        for (const mesh of bird.meshes) mesh.visibility = overlap && !shot ? .28 : 1;
+        for (const mesh of bird.meshes) {
+          mesh.visibility = overlap && !shot ? .28 : 1;
+          if (mesh instanceof Mesh && mesh.metadata?.inkRole === 'bird') mesh.renderOutline = mesh.visibility === 1;
+        }
       }
       for (const [id, bird] of this.birds) if (!seen.has(id)) { bird.root.dispose(false, false); bird.material?.dispose(); this.birds.delete(id); }
     }
@@ -557,5 +571,5 @@ export class GameScene {
     const x = point.x / width * 100, y = point.y / height * 100;
     if (point.z > 0 && point.z < 1 && x > 24 && x < 76 && y > 25 && y < 70) return { x, y };
   }
-  get stats() { return { audience: this.audience?.stats, mode: this.mode, courseId: this.course?.id, fps: Math.round(this.engine.getFps()), meshes: this.scene.getActiveMeshes().length, drawCalls: this.instrumentation.drawCallsCounter.current, triangles: this.scene.getActiveIndices() / 3, vertices: this.scene.getTotalVertices(), renderer: this.renderer, width: this.engine.getRenderWidth(), height: this.engine.getRenderHeight() }; }
+  get stats() { return { antialiasing: { samples: this.fxaa?.samples ?? 1, fxaa: this.fxaaAttached, renderScale: this.engine.getHardwareScalingLevel() }, ink: { style: 'world-space-comic', enabled: this.scene.meshes.filter(m => m instanceof Mesh && m.renderOutline).length, low: this.settings.quality === 'low' }, audience: this.audience?.stats, mode: this.mode, courseId: this.course?.id, fps: Math.round(this.engine.getFps()), meshes: this.scene.getActiveMeshes().length, drawCalls: this.instrumentation.drawCallsCounter.current, triangles: this.scene.getActiveIndices() / 3, vertices: this.scene.getTotalVertices(), renderer: this.renderer, width: this.engine.getRenderWidth(), height: this.engine.getRenderHeight() }; }
 }

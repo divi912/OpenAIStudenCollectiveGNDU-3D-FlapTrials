@@ -21,6 +21,9 @@ test('all nine worlds render and survive switching between tiers', async ({ page
     const data = await page.evaluate(() => (window as any).__flap);
     expect(data.stats.courseId).toBe(course.id);
     expect(data.stats.meshes).toBeGreaterThan(10);
+    expect(data.stats.antialiasing.fxaa).toBe(true);
+    expect(data.stats.antialiasing.samples).toBeGreaterThanOrEqual(4);
+    expect(await page.locator('.clock-panel').evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
     expect(data.stats.audience.draws).toBeLessThanOrEqual(6);
     await page.screenshot({ path: `.cache/world-${course.id}.png` });
     await page.getByRole('button', { name: 'Race menu', exact: true }).click();

@@ -26,3 +26,14 @@ it('ignores input while disabled and preserves another finger holding the same b
  expect(controls.read(2,1).roll).toBe(-1);
  controls.touchEnd(3); expect(controls.read(3,2).roll).toBe(0);
 });
+it('holds boost independently of flap and clears it on release, menus and interruption', () => {
+ const controls = new Controls(); controls.enabled = true;
+ controls.touchStart(1, 'KeyF'); controls.touchStart(2, 'Space');
+ expect(controls.read(1,0)).toMatchObject({boostHeld:true,flapPressed:true});
+ expect(controls.read(2,1)).toMatchObject({boostHeld:true,flapPressed:false});
+ controls.touchEnd(1); expect(controls.read(3,2).boostHeld).toBe(false);
+ controls.touchStart(3,'KeyF'); controls.enabled = false; controls.enabled = true;
+ expect(controls.read(4,3).boostHeld).toBe(false);
+ controls.touchStart(4,'KeyF'); window.dispatchEvent(new Event('blur'));
+ expect(controls.read(5,4).boostHeld).toBe(false);
+});

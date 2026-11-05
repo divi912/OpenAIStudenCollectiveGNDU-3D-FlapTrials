@@ -1,3 +1,4 @@
+import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { Quaternion } from '@babylonjs/core/Maths/math.vector.js';
 import type { CourseDefinition } from '../../shared/protocol';
@@ -27,27 +28,33 @@ export function playgroundLook(course?: Pick<CourseDefinition, 'id'>): Playgroun
   return (course && LOOKS[course.id]) || PLAYGROUND;
 }
 
-/** Instanced tiles follow the actual flight frame; their top stays below the playable floor. */
-export function playgroundSection(place: Place, root: TransformNode, course: CourseDefinition, z: number) {
-  const look = playgroundLook(course);
-  const chunk = new TransformNode(`playground-${z}`, root.getScene()); chunk.parent = root;
-  for (let dz = 0; dz < 128 && z + dz < course.length + 24; dz += 8) {
-    const at = z + dz, frame = frameAt(course, at);
-    const tile = new TransformNode(`route-${at}`, root.getScene()); tile.parent = chunk;
-    tile.position.set(...trackToWorld(course, 0, course.floor - .28, at));
-    tile.rotationQuaternion = Quaternion.RotationYawPitchRoll(frame.yaw, -frame.pitch, 0);
-    // Overlap seams so curved tiles do not expose cracks along the outside edge.
-    place('toy-block', look.purple, tile, [0, -.35, 0], [course.width + 3, .8, 9.2]);
-    place('toy-block', look.blue, tile, [0, .16, 0], [course.width, .24, 9.2]);
-    for (const side of [-1, 1]) place('toy-block', dz % 16 ? look.white : look.pink, tile, [side * (course.width / 2 + .65), .35, 0], [1.3, .62, 9.2]);
-    if (at % 32 === 0) for (const side of [-1, 1]) {
-      const arrow = place('toy-block', look.white, tile, [side * .65, .3, 0], [.3, .04, 1.9]); arrow.rotation.y = -side * .65;
-    }
-    if (at % 64 === 0 && ['terminal_velocity', 'featherless', 'storm_spiral', 'crown_circuit'].includes(course.id))
-      place('toy-block', look.yellow, tile, [0, -.85, 0], [course.width + 4, .2, 1.3]);
+/** Sweep a closed profile through exact shared track-frame endpoints. */
+export function routeStripData(course: CourseDefinition, start: number, end: number, profile: [number, number][]): VertexData {
+  const positions: number[] = [], indices: number[] = [], normals: number[] = [];
+  const steps = Math.ceil((end - start) / 4), n = profile.length;
+  for (let i = 0; i <= steps; i++) for (const [x,y] of profile) positions.push(...trackToWorld(course,x,y,start+(end-start)*i/steps));
+  for (let i = 0; i < steps; i++) for (let j = 0; j < n; j++) {
+    const a=i*n+j,b=i*n+(j+1)%n,c=a+n,d=b+n; indices.push(a,c,b,b,c,d);
   }
-  // This root already uses world coordinates. Scenery is frozen by the caller after anchoring.
-  for (const node of chunk.getDescendants()) if (node instanceof TransformNode) node.freezeWorldMatrix();
+  VertexData.ComputeNormals(positions,indices,normals);
+  const data=new VertexData();data.positions=positions;data.indices=indices;data.normals=normals;return data;
+}
+export function playgroundSection(place: Place, root: TransformNode, course: CourseDefinition, z: number) {
+  const look = playgroundLook(course), chunk=new TransformNode(`playground-${z}`,root.getScene());chunk.parent=root;
+  const start=z===0?-4:z-4,end=Math.min(z+124,course.length+24),half=course.width/2;
+  const strip=(name:string,color:string,x0:number,x1:number,y0:number,y1:number)=>{
+    const instance=place('toy-block',color,chunk);
+    const mesh=instance.sourceMesh.clone(name,null,true)!;mesh.makeGeometryUnique();mesh.parent=chunk;mesh.isVisible=true;mesh.setEnabled(true);
+    instance.dispose();routeStripData(course,start,end,[[x0,y0],[x1,y0],[x1,y1],[x0,y1]]).applyToMesh(mesh);
+    mesh.metadata={...mesh.metadata,routeRibbon:true};mesh.renderOutline=false;mesh.freezeWorldMatrix();
+  };
+  strip('route-base',look.purple,-half-1.3,half+1.3,course.floor-1,course.floor-.24);
+  strip('route-deck',look.blue,-half,half,course.floor-.24,course.floor);
+  for(const side of [-1,1]) strip(`route-edge-${side}`,look.pink,side<0?-half-1.3:half,side<0?-half:half+1.3,course.floor-.24,course.floor+.35);
+  for(let at=z;at<end;at+=32){const tile=new TransformNode('route-marking',root.getScene());tile.parent=chunk;tile.position.set(...trackToWorld(course,0,course.floor+.025,at));const f=frameAt(course,at);tile.rotationQuaternion=Quaternion.RotationYawPitchRoll(f.yaw,-f.pitch,0);
+    for(const side of [-1,1]){const arrow=place('toy-block',look.white,tile,[side*.65,0,0],[.3,.025,1.9]);arrow.rotation.y=-side*.65;}
+  }
+  for(const node of chunk.getDescendants())if(node instanceof TransformNode)node.freezeWorldMatrix();
   return chunk;
 }
 
@@ -83,7 +90,7 @@ function motif(place: Place, parent: TransformNode, id: string, look: Playground
       place('podium', look.yellow, parent, [0, 3.1, 0], [13, .4, 13]);
       place('rod', look.white, parent, [0, 9, 0], [.14, 6, .14]);
       place('toy-leaf', look.pink, parent, [0, 14, 0], [5, 6, 5]);
-      place('toy-leaf', look.white, parent, [0, 14, .12], [1.2, 6.05, 5]);
+
       place('podium', look.yellow, parent, [0, 10.3, 0], [1.8, 1.1, 1.8]);
       break;
     }
@@ -121,7 +128,7 @@ function motif(place: Place, parent: TransformNode, id: string, look: Playground
     case 'terminal_velocity': {
       // Staggered launch decks make the vertical course an aerial fairground.
       for (let tier = 0; tier < 3; tier++) {
-        const x = (tier - 1) * 3.5, y = -4 + tier * 5;
+        const x = side * (tier - 1) * 3.5, y = -4 + tier * 5;
         place('rod', look.purple, parent, [x, y - 3, 0], [1.6, 6, 1.6]);
         place('podium', tier % 2 ? look.yellow : look.pink, parent, [x, y, 0], [7, .9, 9]);
         place('podium', look.white, parent, [x, y + .55, 0], [6.4, .2, 8.4]);
@@ -142,7 +149,7 @@ function motif(place: Place, parent: TransformNode, id: string, look: Playground
       base(place, parent, look, 16); place('rod', look.purple, parent, [0, 5, 0], [3, 20, 3]);
       for (let i = 0; i < 4; i++) { const ring = hoop(place, parent, i % 2 ? look.blue : look.pink, -1 + i * 4.4, 6 - i * .65, true); ring.rotation.z = side * .25; ring.rotation.y = i * .5; }
       place('toy-leaf', look.yellow, parent, [0, 17, 0], [3.6, 3.6, 3.6]);
-      for (let i = 0; i < 3; i++) { const bolt = place('toy-block', look.yellow, parent, [side * 6.5 + (i % 2 ? .7 : 0), 4 + i * 3, 1], [.85, 4, .85]); bolt.rotation.z = i % 2 ? -.5 : .5; }
+      for (let i = 0; i < 3; i++) { const bolt = place('toy-block', look.yellow, parent, [side * (6.5 + (i % 2 ? .7 : 0)), 4 + i * 3, 1], [.85, 4, .85]); bolt.rotation.z = i % 2 ? -.5 : .5; }
       break;
     }
     case 'crown_circuit': {
@@ -176,7 +183,7 @@ export function playgroundScenery(place: Place, parent: TransformNode, z: number
   for (const side of [-1, 1]) {
     if ((z / 128) % 2 === 0) {
       const stand = grandstand(toyPlace, parent, side, z + 48, { grass: look.blue, rim: look.white, stone: look.purple, dark: look.purple, leaf: look.pink, accent: look.yellow });
-      stand.position.x = side * 40; audience(stand);
+      stand.position.x = side * 54; audience(stand);
     }
     // Stagger the two sides. Motif extents stay at least twenty units from the track center.
     const node = landmark(parent, z, z + (side < 0 ? 20 : 88), side * 31, course);

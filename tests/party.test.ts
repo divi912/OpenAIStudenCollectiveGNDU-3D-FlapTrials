@@ -37,10 +37,10 @@ it('collects a gift only once and resets active powers on a crash', () => {
   const course = compileCourse({ ...COURSES[0], obstacles: [gift] });
   const bird = createRacer('gift'); Object.assign(bird, { x: gift.x, y: gift.y, z: gift.z - .1 });
   stepRacer(bird, idleInput(), course, 100);
-  expect(bird.boostUntilTick).toBeGreaterThan(100); expect(bird.pickupMask).toBe(1);
-  const deadline = bird.boostUntilTick;
+  expect(bird.boostReserve).toBeGreaterThan(60); expect(bird.pickupMask).toBe(1);
+  const deadline = bird.boostReserve;
   bird.z = gift.z - .1; stepRacer(bird, idleInput(), course, 110);
-  expect(bird.boostUntilTick).toBe(deadline);
+  expect(bird.boostReserve).toBeLessThan(deadline + 1);
   bird.x = 100; stepRacer(bird, idleInput(), course, 111);
   expect(bird.status).toBe('crashed'); expect(bird.boostUntilTick).toBe(0);
 });

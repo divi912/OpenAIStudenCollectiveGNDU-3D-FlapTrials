@@ -21,7 +21,7 @@ export class Controls {
       if ((e.target instanceof HTMLInputElement) || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
       if (e.code === 'Escape' && !e.repeat) { this.onMenu(); return; }
       if (!this.enabled) return;
-      if (['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'ShiftLeft', 'ShiftRight', 'KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyQ', 'KeyE'].includes(e.code)) e.preventDefault();
+      if (['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'ShiftLeft', 'ShiftRight', 'KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyQ', 'KeyE', 'KeyF'].includes(e.code)) e.preventDefault();
       this.keys.add(e.code);
       if (e.code === 'Space' && !e.repeat) { this.flaps = Math.min(2, this.flaps + 1); this.onFlap(); }
       if (e.code === 'KeyR' && !e.repeat) this.onRestart();
@@ -47,6 +47,7 @@ export class Controls {
     const flapPressed = this.enabled && this.flaps > 0;
     if (flapPressed) this.flaps--;
     return { sequence, tick, steer: this.enabled ? steer as -1 | 0 | 1 : 0, flapPressed, diveHeld: this.enabled && (held('ShiftLeft') || held('ShiftRight')),
+      boostHeld: this.enabled && held('KeyF'),
       pitch: this.enabled ? (Number(held('KeyW') || held('ArrowUp')) - Number(held('KeyS') || held('ArrowDown'))) as -1 | 0 | 1 : 0,
       roll: this.enabled ? (Number(held('KeyQ')) - Number(held('KeyE'))) as -1 | 0 | 1 : 0 };
   }

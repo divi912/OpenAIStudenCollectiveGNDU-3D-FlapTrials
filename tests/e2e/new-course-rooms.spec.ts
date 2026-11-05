@@ -26,6 +26,7 @@ test('private rooms synchronize all nine choices and start the final hard course
   }
   await guest.getByRole('button', { name: 'Ready up', exact: true }).click();
   await host.getByRole('button', { name: 'Ready up', exact: true }).click();
+  await host.evaluate(() => { setInterval(() => { window.dispatchEvent(new KeyboardEvent('keydown', {code:'Space'})); window.dispatchEvent(new KeyboardEvent('keyup', {code:'Space'})); },450); });
   await host.getByRole('button', { name: 'Start the race' }).click();
   for (const page of [host, guest]) await page.waitForFunction(() => (window as any).__flap.room?.phase === 'racing', undefined, { timeout: 20000 });
   const states = await Promise.all([host, guest].map(page => page.evaluate(() => ({ room: (window as any).__flap.room, stats: (window as any).__flap.stats }))));
@@ -34,6 +35,13 @@ test('private rooms synchronize all nine choices and start the final hard course
     expect(state.room.courseId).toBe('crown_circuit'); expect(state.stats.courseId).toBe('crown_circuit');
     expect(Object.keys(state.room.players)).toHaveLength(2);
   }
+  const hostId = await host.evaluate(() => (window as any).__flap.sessionId);
+  const initial = await guest.evaluate(id => (window as any).__flap.room.players[id].boostReserve, hostId);
+  await host.keyboard.down('KeyF');
+  await guest.waitForFunction(id => (window as any).__flap.room.players[id].boostActive, hostId, { timeout: 5000 });
+  await guest.waitForFunction(({ id, initial }) => (window as any).__flap.room.players[id].boostReserve < initial - 3, { id: hostId, initial });
+  await host.keyboard.up('KeyF');
+  await guest.waitForFunction(id => !(window as any).__flap.room.players[id].boostActive, hostId);
   expect(errors).toEqual([]);
   await context.close();
 });

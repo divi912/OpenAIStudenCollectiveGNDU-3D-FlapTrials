@@ -38,7 +38,7 @@ export function grandstand(place: Place, parent: TransformNode, side: number, z:
   for (const x of [-37, 37]) {
     place('rod', '#e4ddc6', stand, [x, 5.9, -8], [.4, 12, .4]);
     place('rod', theme.accent, stand, [x, 7.9, -8], [.65, .3, .65]);
-    const flag = place('banner', '#ffffff', stand, [x + 1.9, 10.7, -8], [4, 1.8, 1]); flag.rotation.y = .18;
+    const flag = place('banner', '#ffffff', stand, [x + (x < 0 ? 1.9 : -1.9), 10.7, -8], [4, 1.8, 1]); flag.rotation.y = .18;
   }
   // Rounded canopy and luminous fascia give the stands an airborne arena silhouette.
   place('island', '#e8dfc8', stand, [0, 9.1, -9.7], [44, .45, 5.6]);
@@ -56,7 +56,7 @@ export function grandstand(place: Place, parent: TransformNode, side: number, z:
     place('leaf', '#fff1cc', stand, [i * 6, 1.15, 1.55], [.22, .22, .22]);
   }
   for (const x of [-26, 0, 26]) {
-    const brace = place('panel', '#516b68', stand, [x, -1.2, -3.8], [.5, 3.4, 7]); brace.rotation.z = x < 0 ? -.3 : .3;
+    const brace = place('panel', '#516b68', stand, [x, -1.2, -3.8], [.5, 3.4, 7]); brace.rotation.z = x === 0 ? 0 : x < 0 ? -.3 : .3;
     place('panel', theme.accent, stand, [x, -.3, 1.4], [7, .18, .18]);
   }
   for (const x of [-38, 0, 38]) place('leaf', '#ffcf6d', stand, [x, 8.6, -6], [.7, .3, .4]);

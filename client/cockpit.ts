@@ -15,6 +15,7 @@ export function hudTemplate(course: CourseDefinition, practice: boolean): string
     <div class="gate-reticle" id="gate-reticle" hidden><i></i></div>
     <div class="center-cue" id="center-cue" aria-live="polite"></div>
     <div class="gate-guidance" id="gate-guidance"><span class="sr-only" id="gate-name">Next gate</span><strong id="gate-instruction"></strong><small id="next-checkpoint"></small></div>
+    <section class="boost-reserve" aria-label="Boost reserve"><div class="boost-heading"><span>BOOST <kbd>F</kbd></span><strong id="boost-percent">60%</strong></div><div class="boost-track" role="meter" aria-label="Stored boost" aria-valuemin="0" aria-valuemax="100" aria-valuenow="60"><i id="boost-fill" style="width:60%"></i></div><small id="boost-state">Hold to boost</small></section>
     <div class="power-status" id="power-status" hidden></div>
     <footer class="cockpit-bottom"><section class="flight-card navigation-panel"><div class="navigation-title"><span class="instrument-label">${icon('flag', 14)} CHECKPOINTS</span><strong id="checkpoint-text">0 / ${course.checkpoints.length}</strong></div><div class="progress-track" role="progressbar" aria-label="Course progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="course-progress"></div></div></section></footer>
     <div class="performance" id="performance" hidden></div>

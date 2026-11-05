@@ -7,10 +7,13 @@ import { wingOffset, wrapAngle, bodyRoll } from './track';
 export const PHYSICS = Object.freeze({ gravity: 12, flapImpulse: 5.5, maxClimb: 8, maxFall: 15, baseSpeed: 16, maxSpeed: 22,
   maxLateral: 10, flapIntervalTicks: 8, respawnTicks: 36, radius: 0.32,
   lateralAcceleration: 23, lateralDrag: 3.8, diveAcceleration: 15, diveSpeedRecovery: 2.1, speedRecovery: 1.4, flapSpeedCost: 0.65 });
-export function idleInput(): InputFrame { return { sequence: 0, tick: 0, steer: 0, flapPressed: false, diveHeld: false, pitch: 0, roll: 0 }; }
+export const BOOST = Object.freeze({ capacity: 100, initial: 60, speedBonus: 6, drainPerSecond: 25, regenPerSecond: 4,
+  regenDelayTicks: 90, activationMinimum: 15, gateReward: 6, pickupReward: 25, crashCost: 25, maxSpeed: 30 });
+export function idleInput(): InputFrame { return { sequence: 0, tick: 0, steer: 0, flapPressed: false, diveHeld: false, boostHeld: false, pitch: 0, roll: 0 }; }
 export function createRacer(playerId: string): RacerState {
   return { playerId, x: 0, y: 6, z: 0, vx: 0, vy: 0, speed: 16, checkpointIndex: 0, sectionProgress: 0,
     crashCount: 0, status: 'racing', nextFlapTick: 0, respawnTick: 0, finishTick: -1, finishFraction: 0, lastProcessedSequence: -1, simulationTick: -1, crashCause: '', boostUntilTick: 0, shieldUntilTick: 0, pickupMask: 0,
+    boostReserve: BOOST.initial, boostCooldownUntilTick: 0, boostActive: false, boostRewardZ: -1,
     heading: 0, pitch: 0, roll: 0, rollTravel: 0, trickCount: 0, gatesCleared: 0, cleanStreak: 0, bestStreak: 0, styleScore: 0 };
 }
 export function respawnRacer(s: RacerState, course: CompiledCourse): void {
@@ -18,10 +21,13 @@ export function respawnRacer(s: RacerState, course: CompiledCourse): void {
   s.x = cp?.x ?? 0; s.y = cp?.y ?? 6; s.z = cp?.z ?? 0;
   s.vx = 0; s.vy = 0; s.speed = 16; s.status = 'racing'; s.sectionProgress = 0;
   s.heading = 0; s.pitch = 0; s.roll = 0; s.rollTravel = 0; s.cleanStreak = 0;
+  s.boostActive = false;
 }
 function crash(s: RacerState, tick: number, cause: string): void {
   s.status = 'crashed'; s.crashCount++; s.respawnTick = tick + PHYSICS.respawnTicks; s.crashCause = cause;
   s.boostUntilTick = 0; s.shieldUntilTick = 0;
+  s.boostReserve = Math.max(0, s.boostReserve - BOOST.crashCost); s.boostActive = false;
+  s.boostCooldownUntilTick = tick + BOOST.regenDelayTicks;
   s.cleanStreak = 0; s.rollTravel = 0;
 }
 export function stepRacer(s: RacerState, input: InputFrame, course: CompiledCourse, tick: number, raceStartTick = 0): void {
@@ -40,7 +46,13 @@ export function stepRacer(s: RacerState, input: InputFrame, course: CompiledCour
   const seconds = (tick - raceStartTick) * DT, event = partyEvent(seconds);
   const chaos = event.warning ? 'calm' : event.kind;
   const shielded = tick < s.shieldUntilTick;
-  const targetSpeed = (input.diveHeld ? PHYSICS.maxSpeed : PHYSICS.baseSpeed) + (chaos === 'turbo' ? 6 : 0) + (tick < s.boostUntilTick ? 9 : 0);
+  s.boostActive = input.boostHeld === true && s.boostReserve > 1e-9 && (s.boostActive || s.boostReserve >= BOOST.activationMinimum);
+  if (s.boostActive) {
+    s.boostReserve = Math.max(0, s.boostReserve - BOOST.drainPerSecond * DT);
+    if (s.boostReserve < 1e-9) s.boostReserve = 0;
+    s.boostCooldownUntilTick = tick + BOOST.regenDelayTicks;
+  } else if (tick >= s.boostCooldownUntilTick) s.boostReserve = Math.min(BOOST.capacity, s.boostReserve + BOOST.regenPerSecond * DT);
+  const targetSpeed = Math.min(BOOST.maxSpeed, (input.diveHeld ? PHYSICS.maxSpeed : PHYSICS.baseSpeed) + (chaos === 'turbo' ? 6 : 0) + (s.boostActive ? BOOST.speedBonus : 0));
   if (input.flapPressed && tick >= s.nextFlapTick) {
     s.vy = Math.min(PHYSICS.maxClimb, s.vy + PHYSICS.flapImpulse * (.45 + .55 * Math.cos(bodyRoll(s.heading, s.roll))) * Math.cos(s.pitch));
     s.vx -= Math.sin(bodyRoll(s.heading, s.roll)) * PHYSICS.flapImpulse * .15;
@@ -51,12 +63,12 @@ export function stepRacer(s: RacerState, input: InputFrame, course: CompiledCour
   s.vx += (Math.sin(s.heading) * s.speed - s.vx) * (1 - Math.exp(-5 * DT));
   s.vx = Math.max(-PHYSICS.maxLateral, Math.min(PHYSICS.maxLateral, s.vx));
   if (chaos === 'crosswind') s.vx = Math.max(-PHYSICS.maxLateral, Math.min(PHYSICS.maxLateral, s.vx + Math.sin(seconds * 1.7) * 14 * DT));
-  s.speed += (Math.min(30, targetSpeed) - s.speed) * (1 - Math.exp(-(targetSpeed > 22 ? 4 : input.diveHeld ? PHYSICS.diveSpeedRecovery : PHYSICS.speedRecovery) * DT));
+  s.speed = Math.min(BOOST.maxSpeed, s.speed + (targetSpeed - s.speed) * (1 - Math.exp(-(s.boostActive || targetSpeed > 22 ? 4 : input.diveHeld ? PHYSICS.diveSpeedRecovery : PHYSICS.speedRecovery) * DT)));
   const candidates = course.bins.get(Math.floor(s.z / 64)) ?? [];
   for (const o of candidates) {
     if (Math.abs(s.z - o.z) < 7 && Math.abs(s.x - o.x) < o.width / 2 && Math.abs(s.y - o.y) < o.height / 2) {
       if (o.kind === 'gust') s.vx = Math.max(-PHYSICS.maxLateral, Math.min(PHYSICS.maxLateral, s.vx + o.strength * DT));
-      if (o.kind === 'speed_zone') { s.speed = Math.max(s.speed, Math.min(Math.min(30, Math.max(PHYSICS.maxSpeed, targetSpeed)), s.speed + 6 * DT)); s.vy = Math.max(-15, s.vy - 3 * DT); }
+      if (o.kind === 'speed_zone') { s.speed = Math.max(s.speed, Math.min(Math.min(BOOST.maxSpeed, Math.max(PHYSICS.maxSpeed, targetSpeed)), s.speed + 6 * DT)); s.vy = Math.max(-15, s.vy - 3 * DT); }
     }
   }
   const to: Vec3 = [s.x + s.vx * DT, s.y + (s.vy + Math.sin(s.pitch) * s.speed * .55) * DT, s.z + s.speed * Math.cos(s.heading) * Math.cos(s.pitch) * DT];
@@ -66,6 +78,7 @@ export function stepRacer(s: RacerState, input: InputFrame, course: CompiledCour
   let impact = 2;
   let crashCause = 'obstacle';
   let clearCount = 0, clearScore = 0;
+  let reserveReward = 0, rewardZ = s.boostRewardZ;
   for (const o of candidates) {
     if (Math.abs(o.z - s.z) > 4 || !isGate(o)) continue;
     const moving = o.kind === 'shutter' || o.kind === 'rotating_gate';
@@ -85,7 +98,11 @@ export function stepRacer(s: RacerState, input: InputFrame, course: CompiledCour
       const x = dx * Math.cos(pose.angle) + dy * Math.sin(pose.angle);
       const y = -dx * Math.sin(pose.angle) + dy * Math.cos(pose.angle);
       if (apertureClearance(o, x, y) < (shielded ? .01 : PHYSICS.radius)) { impact = crossing; crashCause = 'missed_gate'; }
-      else { clearCount++; clearScore += apertureClearance(o, x, y) < .9 ? 120 : 80; }
+      else {
+        clearCount++; clearScore += apertureClearance(o, x, y) < .9 ? 120 : 80;
+        // Gates are mandatory forward crossings: the furthest rewarded plane survives respawns.
+        if (o.z > s.boostRewardZ) { reserveReward += BOOST.gateReward; rewardZ = Math.max(rewardZ, o.z); }
+      }
     }
   }
   const d = course.definition;
@@ -106,14 +123,17 @@ export function stepRacer(s: RacerState, input: InputFrame, course: CompiledCour
     s.x = from[0] + (to[0] - from[0]) * impact; s.y = from[1] + (to[1] - from[1]) * impact; s.z = from[2] + (to[2] - from[2]) * impact;
     crash(s, tick, crashCause);
   } else { s.x = to[0]; s.y = to[1]; s.z = to[2]; }
-  if (!hitObstacle) { s.gatesCleared += clearCount; s.cleanStreak += clearCount; s.bestStreak = Math.max(s.bestStreak, s.cleanStreak); s.styleScore += clearScore; }
+  if (!hitObstacle) {
+    s.gatesCleared += clearCount; s.cleanStreak += clearCount; s.bestStreak = Math.max(s.bestStreak, s.cleanStreak); s.styleScore += clearScore;
+    s.boostReserve = Math.min(BOOST.capacity, s.boostReserve + reserveReward); s.boostRewardZ = rewardZ;
+  }
   if (s.status === 'racing') for (const o of candidates) {
     if (o.kind !== 'pickup' || (s.pickupMask & (1 << o.pickupIndex!))) continue;
     const crossing = crossingFraction(from[2], s.z, o.z);
     if (crossing !== null && Math.hypot((from[0] + (s.x - from[0]) * crossing - o.x) / (o.width / 2), (from[1] + (s.y - from[1]) * crossing - o.y) / (o.height / 2)) < 1) {
       s.pickupMask |= 1 << o.pickupIndex!;
       s.styleScore += 25;
-      if (o.powerUp === 'boost') s.boostUntilTick = tick + 150; else s.shieldUntilTick = tick + 240;
+      if (o.powerUp === 'boost') s.boostReserve = Math.min(BOOST.capacity, s.boostReserve + BOOST.pickupReward); else s.shieldUntilTick = tick + 240;
     }
   }
   const previousZ = d.checkpoints[s.checkpointIndex - 1]?.z ?? 0;

@@ -32,6 +32,7 @@ Racers have screen-facing overhead name tags showing their chosen names. The cha
 | W / S or up/down arrows | Pitch up/down |
 | Q / E | Roll left/right; release to ease upright |
 | Shift | Dive |
+| F | Hold to spend stored boost reserve |
 | R | Restart solo practice |
 | Esc | Open/close settings; online races keep running |
 | F3 | Toggle rendering/network diagnostics |
@@ -44,7 +45,7 @@ The minimal race HUD keeps time, placement, flock standings, next-opening guidan
 
 An original upbeat 132 BPM instrumental, **Wing Cup Weekend**, starts after the first interaction. It is synthesized once into a seamless 29-second loop and then uses a single audio source during play, with no music download or live note scheduling. Settings has separate saved music and sound-effect volume controls; zero mutes music. Audio suspends while the tab is hidden.
 
-The party upgrade adds circular, oval, triangular, diamond, hexagonal and rectangular gates in tighter sequences. Gold crystals grant **2.5 seconds of Rocket Boost**; blue crystals grant a **4-second Bubble Shield** that forgives frame scrapes while still requiring a valid opening crossing. Pickups are personal to each racer, collected once per race, and active powers clear on a crash.
+The party upgrade adds circular, oval, triangular, diamond, hexagonal and rectangular gates in tighter sequences. Gold crystals refill **25% stored boost reserve**; blue crystals grant a **4-second Bubble Shield** that forgives frame scrapes while still requiring a valid opening crossing. Pickups are personal to each racer, collected once per race, and active powers clear on a crash.
 
 Starting 12 seconds into the race, a three-second warning announces a shared event. **Turbo Flock** gives everyone a tailwind, **Moon Wings** lowers gravity, and **Wild Winds** adds lateral gusts. Events last seven seconds with recovery gaps between them. All phases use authoritative race ticks, including in client prediction. Solo practice uses the same rules.
 
@@ -142,3 +143,10 @@ Babylon.js: Apache-2.0. Colyseus: MIT. Fredoka and Manrope fonts: SIL Open Font 
 ## Phone controls
 
 Touch devices have on-screen turn/pitch, flap, dive and roll controls. Portrait and landscape layouts adapt to the screen. See [phone controls](docs/MOBILE-CONTROLS.md).
+
+
+## Stored boost and ink rendering
+
+Hold **F** (or the touch **BOOST** button) to spend reserve for extra speed. Start with60%; a full tank lasts4seconds. Normal flight recharges4% per second after a1.5-second delay. Clean gates award6% once each; gold pickups add25%. Crashes cost25%, and respawns do not refill the meter. A new burst needs15%; active bursts can spend the remainder. Dive, events and manual boost share the30 speed cap. Server-authoritative reserve is included in prediction/reconciliation; protocol4 and physicsflight-3d-4 require matching client/server deployment.
+
+Dark world-space outlines mark birds, gates and solid landmarks. Low quality retains racer and gate ink while dropping landmark outlines. Static route ribbons replace overlapping deck boxes; balloons use a single hull and directional landmarks mirror correctly. This treatment uses techniques from the local Three.js skills in Babylon.js; it does not add another renderer.

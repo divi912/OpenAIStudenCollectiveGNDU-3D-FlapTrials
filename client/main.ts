@@ -230,11 +230,17 @@ function updateHud(now: number, players: PlayerSnapshot[], localId: string, elap
   document.querySelector('.cockpit')?.classList.toggle('party-active', event.kind !== 'calm');
   const partyKey = `${event.kind}-${event.warning}`;
   if (partyKey !== previousParty) { previousParty = partyKey; if (event.kind !== 'calm') audio.tone(event.warning ? 420 : 740, .2); }
-  party.innerHTML = `<span>${event.warning ? 'UPCOMING EVENT' : 'RACE EVENT'}</span><strong>${event.name} <i>${Math.ceil(event.remaining)}</i></strong><small>${event.warning ? `Starts in ${Math.ceil(event.remaining)}… get ready!` : event.detail}</small>`;
+  party.innerHTML = `<strong>${event.name} <i>${Math.ceil(event.remaining)}</i></strong><small>${event.warning ? `Starts in ${Math.ceil(event.remaining)}… get ready!` : event.detail}</small>`;
   const powers = document.querySelector<HTMLElement>('#power-status')!;
-  const boost = Math.max(0, (local.boostUntilTick - local.simulationTick) / 60), shield = Math.max(0, (local.shieldUntilTick - local.simulationTick) / 60);
-  powers.innerHTML = `${boost ? `<span class="boost-power">✦ ROCKET <b>${boost.toFixed(1)}s</b></span>` : ''}${shield ? `<span class="shield-power">◈ BUBBLE <b>${shield.toFixed(1)}s</b></span>` : ''}`;
-  powers.hidden = !boost && !shield;
+  const shield = Math.max(0, (local.shieldUntilTick - local.simulationTick) / 60);
+  powers.innerHTML = shield ? `<span class="shield-power">Shield <b>${shield.toFixed(1)}s</b></span>` : '';
+  powers.hidden = !shield;
+  const reserve = Math.max(0, Math.min(100, local.boostReserve));
+  document.querySelector('#boost-percent')!.textContent = `${Math.floor(reserve)}%`;
+  (document.querySelector('#boost-fill') as HTMLElement).style.width = `${reserve}%`;
+  document.querySelector('[aria-label="Stored boost"]')?.setAttribute('aria-valuenow', String(Math.floor(reserve)));
+  document.querySelector('.boost-reserve')?.classList.toggle('active', local.boostActive);
+  document.querySelector('#boost-state')!.textContent = countdown > 0 ? 'Ready' : local.boostActive ? 'Boosting' : reserve < 15 ? 'Recharging' : document.body.dataset.touch === 'true' ? 'Hold BOOST' : 'Hold F';
   if (local.pickupMask !== previousPickupMask) { previousPickupMask = local.pickupMask; audio.tone(1100, .16); }
   time.textContent = formatTime(local.status === 'finished' ? finishSeconds(local, practice ? 0 : connection.room?.state.startTick ?? 0) : elapsed);
   document.querySelector('#checkpoint-text')!.textContent = `${local.checkpointIndex} / ${course.checkpoints.length}`;

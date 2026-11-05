@@ -15,7 +15,7 @@ export function mountTouchControls(controls: Controls, parent: HTMLElement) {
     <span class="touch-pad-label">TURN / PITCH</span></div>
     <div class="touch-actions" role="group" aria-label="Flight actions">
     <div class="touch-roll">${button('KeyQ', 'Roll left', 'ROLL ↶')}${button('KeyE', 'Roll right', 'ROLL ↷')}</div>
-    <div class="touch-flap-row">${button('ShiftLeft', 'Dive', 'DIVE')}${button('Space', 'Flap', 'FLAP', 'touch-flap')}</div></div>`;
+    <div class="touch-flap-row">${button('ShiftLeft', 'Dive', 'DIVE')}${button('KeyF', 'Hold to boost', 'BOOST', 'touch-boost')}${button('Space', 'Flap', 'FLAP', 'touch-flap')}</div></div>`;
   parent.append(root);
   const clearFeedback = () => root.querySelectorAll('.pressed').forEach(el => el.classList.remove('pressed'));
   controls.onEnabledChange = enabled => { root.hidden = !enabled; if (!enabled) clearFeedback(); };

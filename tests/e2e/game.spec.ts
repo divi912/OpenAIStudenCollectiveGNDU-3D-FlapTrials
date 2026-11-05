@@ -96,9 +96,9 @@ test('a practice race announces and applies its first shared party event', async
   await page.goto('/?webgl=1');
   await expect(page.locator('body')).toHaveAttribute('data-renderer', 'WebGL2', { timeout: 45000 });
   await page.getByRole('button', { name: 'Practice' }).click();
-  await expect(page.locator('#party-event')).toContainText('UPCOMING EVENT', { timeout: 23000 });
+  await expect(page.locator('#party-event')).toBeVisible({ timeout: 23000 });
   await expect(page.locator('#party-event')).toContainText('TAILWIND');
-  await expect(page.locator('#party-event')).toContainText('RACE EVENT', { timeout: 6000 });
+  await expect(page.locator('#party-event')).not.toHaveClass(/warning/, { timeout: 6000 });
   await page.waitForFunction(() => (window as any).__flap.practice.speed > 20, { timeout: 8000 });
   await expect(page.locator('#party-event')).toContainText('TAILWIND');
 });
