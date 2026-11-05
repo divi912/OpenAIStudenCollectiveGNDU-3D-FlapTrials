@@ -1,8 +1,8 @@
 export type PartyKind = 'calm' | 'turbo' | 'moon' | 'crosswind';
 const events = [
-  { kind: 'turbo', name: 'TURBO FLOCK', detail: 'Everyone gets a tailwind. Hold your line!', color: '#ffb44f' },
-  { kind: 'moon', name: 'MOON WINGS', detail: 'Low gravity. Easy on the flaps!', color: '#bda4ff' },
-  { kind: 'crosswind', name: 'WILD WINDS', detail: 'A gusty surprise. Counter-steer!', color: '#6fe4d2' },
+  { kind: 'turbo', name: 'TAILWIND', detail: 'Increased forward speed.', color: '#ffb44f' },
+  { kind: 'moon', name: 'LOW GRAVITY', detail: 'Reduced gravity.', color: '#bda4ff' },
+  { kind: 'crosswind', name: 'GUSTS', detail: 'Alternating crosswind.', color: '#6fe4d2' },
 ] as const;
 /** A race-wide party director. No client clocks, random timers or per-client phases. */
 export function partyEvent(seconds: number): { kind: PartyKind; name: string; detail: string; color: string; warning: boolean; remaining: number } {

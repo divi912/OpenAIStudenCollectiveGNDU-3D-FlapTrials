@@ -25,7 +25,7 @@ test('the production website uses its gateway when direct Render access is block
     directRequests.push(route.request().url()); return route.abort('blockedbyclient');
   });
   await page.goto(`${origin}/?webgl=1`);
-  await page.getByRole('button', { name: 'Create a room', exact: true }).click();
+  await page.getByRole('button', { name: 'Create room', exact: true }).click();
   await page.getByRole('button', { name: 'Create private room' }).click();
   await expect.poll(() => creates).toBe(1);
   expect(directRequests).toEqual([]);

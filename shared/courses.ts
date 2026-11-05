@@ -3,74 +3,125 @@ import type { ApertureShape, Box, CompiledCourse, CourseDefinition, ObstacleDefi
 export const APERTURE_SHAPES: ApertureShape[] = ['circle', 'hexagon', 'oval', 'diamond', 'triangle', 'rectangle'];
 export const isGate = (o: ObstacleDefinition) => !['gust', 'speed_zone', 'pickup'].includes(o.kind);
 
-const descriptions = [
-  ['skyline_sprint', 'Skyline Sprint', 'A little courage. A lot of sky.', 'EASY', 'Learn flap rhythm and sweeping turns, then bank through forgiving twist slots.', '#67b4b0', '#c0e5e6', '#76b9a5', 55],
-  ['the_needle', 'The Needle', 'Small gaps. Big feelings.', 'PRECISE', 'Bank through alternating narrow slots and twisting tunnel sequences.', '#ddab75', '#f1ddba', '#bc9879', 70],
-  ['crosswind', 'Crosswind', 'Go against the whoosh.', 'INTERMEDIATE', 'Carve banked slaloms and hold your wings steady against sweeping gusts.', '#85a7c9', '#cbdff0', '#89a8bc', 80],
-  ['clockwork', 'Clockwork', 'Timing is everything.', 'ADVANCED', 'Time rotating apertures, pitch through shutters and thread banked twist corridors.', '#b69bbf', '#dfd4e9', '#a999b4', 90],
-  ['terminal_velocity', 'Terminal Velocity', 'What goes down, must flap up.', 'ADVANCED', 'Pitch through sweeping climbs and dives, saving momentum for angled slots.', '#df957a', '#f4d3bb', '#c29480', 100],
-  ['featherless', 'Featherless', 'For the beautifully stubborn.', 'EXPERT', 'Helix alignments, twisting shafts and compound banks through the sharpest curves.', '#92aa8c', '#dce4c6', '#99aa82', 110],
-] as const;
+type RoutePoint = readonly [x: number, y: number, shape: ApertureShape];
+interface CourseRecipe {
+  id: string; name: string; subtitle: string; description: string;
+  color: string; sky: string; ground: string;
+  /** Repeated stage motifs are mirrored after each recovery plaza. */
+  route: readonly RoutePoint[];
+}
 
-export const COURSES: CourseDefinition[] = descriptions.map((meta, index) => {
-  const [id, name, subtitle, difficulty, description, color, sky, ground, estimatedClearSeconds] = meta;
-  const length = estimatedClearSeconds * 16;
-  const checkpoints = Array.from({ length: Math.floor((length - 100) / (index < 2 ? 140 : 180)) }, (_, i) => ({ id: `cp-${i + 1}`, z: (i + 1) * (index < 2 ? 140 : 180), x: 0, y: 6 }));
+const recipes: CourseRecipe[] = [
+  { id: 'skyline_sprint', name: 'Skyline Sprint', subtitle: 'A little courage. A lot of sky.',
+    description: 'A grand skyway of rising arches, sweeping rooftop turns and forgiving bank slots.',
+    color: '#67b4b0', sky: '#c0e5e6', ground: '#76b9a5',
+    route: [[0, 6, 'circle'], [2.8, 7, 'hexagon'], [4, 8.5, 'oval'], [2, 9, 'diamond'], [-2.8, 7, 'circle'], [-4, 5.5, 'triangle']] },
+  { id: 'cloud_carnival', name: 'Cloud Carnival', subtitle: 'Take the scenic loop.',
+    description: 'Loop around giant cloud hoops, climb a festival arch and sweep through the carousel.',
+    color: '#e4ad51', sky: '#f9e6c6', ground: '#8bbeb8',
+    route: [[0, 6, 'hexagon'], [-3.6, 6.5, 'circle'], [-4.2, 8.5, 'oval'], [0, 10, 'triangle'], [4.2, 8.5, 'circle'], [3.6, 6, 'diamond']] },
+  { id: 'crosswind', name: 'Crosswind', subtitle: 'Go against the whoosh.',
+    description: 'Wide zigzag sails lead into gust lanes, high bridges and an open-sky slalom.',
+    color: '#85a7c9', sky: '#cbdff0', ground: '#89a8bc',
+    route: [[0, 6, 'oval'], [4.5, 6, 'diamond'], [-3.6, 7.5, 'hexagon'], [3.6, 9.5, 'circle'], [-4.5, 7, 'oval'], [0, 4.8, 'triangle']] },
+  { id: 'the_needle', name: 'The Needle', subtitle: 'Small gaps. Big feelings.',
+    description: 'A cathedral of slim portals: bank through long needle aisles and climb diamond spires.',
+    color: '#ddab75', sky: '#f1ddba', ground: '#bc9879',
+    route: [[0, 6, 'rectangle'], [-3, 7.5, 'diamond'], [-3.5, 9.5, 'triangle'], [0, 8, 'rectangle'], [3.5, 6, 'hexagon'], [3, 4.5, 'oval']] },
+  { id: 'clockwork', name: 'Clockwork', subtitle: 'Timing is everything.',
+    description: 'Pass immense rotating gears, stepped shutter towers and a turning escapement corridor.',
+    color: '#b69bbf', sky: '#dfd4e9', ground: '#a999b4',
+    route: [[0, 6, 'hexagon'], [3.8, 6, 'diamond'], [3.8, 9, 'rectangle'], [0, 10, 'hexagon'], [-3.8, 9, 'circle'], [-3.8, 5, 'oval']] },
+  { id: 'terminal_velocity', name: 'Terminal Velocity', subtitle: 'What goes down, must flap up.',
+    description: 'Climb the launch tower, dive through low speed lanes and pull up into a soaring finish.',
+    color: '#df957a', sky: '#f4d3bb', ground: '#c29480',
+    route: [[0, 6, 'triangle'], [3.5, 10.5, 'circle'], [4, 8, 'oval'], [0, 4, 'hexagon'], [-4, 3.8, 'diamond'], [-3.5, 8, 'rectangle']] },
+  { id: 'featherless', name: 'Featherless', subtitle: 'For the beautifully stubborn.',
+    description: 'Trace a vast ascending helix, cut through tilted shafts and bank across its broken crown.',
+    color: '#92aa8c', sky: '#dce4c6', ground: '#99aa82',
+    route: [[0, 6, 'diamond'], [4.5, 5, 'hexagon'], [5, 8, 'circle'], [1, 10.5, 'triangle'], [-4.5, 9, 'oval'], [-5, 5.5, 'rectangle'], [0, 4, 'hexagon']] },
+  { id: 'storm_spiral', name: 'Storm Spiral', subtitle: 'Find the eye. Fly through.',
+    description: 'Spiral between storm shutters, ride alternating gusts and thread the quiet eye of the storm.',
+    color: '#718dce', sky: '#c8d2ec', ground: '#8c9aa6',
+    route: [[0, 6, 'oval'], [-4.8, 5, 'triangle'], [-4.8, 9, 'diamond'], [0, 11, 'circle'], [4.8, 9, 'hexagon'], [4.8, 5, 'rectangle'], [0, 3.5, 'oval']] },
+  { id: 'crown_circuit', name: 'Crown Circuit', subtitle: 'Earn every feather.',
+    description: 'The final grand circuit combines crown spires, gear galleries, deep dives and banked storm lanes.',
+    color: '#c694ba', sky: '#eed6e8', ground: '#b7a0af',
+    route: [[0, 6, 'triangle'], [4.5, 10, 'diamond'], [5, 6, 'hexagon'], [1.5, 3.5, 'oval'], [-4.5, 5, 'rectangle'], [-5, 10.5, 'circle'], [0, 11, 'hexagon'], [3.5, 7, 'diamond']] },
+];
+
+const quantize = (value: number) => Number(value.toFixed(6));
+
+export const COURSES: CourseDefinition[] = recipes.map((recipe, index) => {
+  const { id, name, subtitle, description, color, sky, ground, route } = recipe;
+  const difficultyGroup = (['easy', 'medium', 'hard'] as const)[Math.floor(index / 3)];
+  const difficultyLevel = (index % 3 + 1) as 1 | 2 | 3;
+  const length = 1280 + index * 160;
+  const checkpoints: CourseDefinition['checkpoints'] = [];
+  for (let z = index === 0 ? 140 : 220; z < length - 125; z += 200 + index * 10) {
+    checkpoints.push({ id: `cp-${checkpoints.length + 1}`, z, x: 0, y: 6 });
+  }
   const obstacles: ObstacleDefinition[] = [];
-  const gap = index === 0 ? 36 : index === 5 ? 29 : 33;
-  for (let z = 70, i = 0; z < length - 45; z += gap, i++) {
-    if (checkpoints.some(cp => Math.abs(cp.z - z) < 23)) continue;
-    let kind: ObstacleKind = i % 3 === 1 ? 'wall' : 'ring';
-    if (index === 2 && i % 3 === 1) kind = 'gust';
-    if (index === 3) kind = i % 2 ? 'shutter' : 'rotating_gate';
-    if (index === 4 && i % 3 === 1) kind = 'speed_zone';
-    if (index === 5) kind = (['ring', 'shutter', 'wall', 'gust', 'rotating_gate'] as const)[i % 5];
-    const x = Number((i === 0 ? 0 : Math.sin(i * 1.6) * (index === 0 ? 1.8 : 4.2)).toFixed(6));
-    const y = Number((index === 4 ? [10, 3.5, 5, 11, 4][i % 5] : 6 + Math.sin(i * 1.9) * (index === 0 ? 1 : 2.8)).toFixed(6));
-    const shape = APERTURE_SHAPES[i % APERTURE_SHAPES.length];
-    const narrow = shape === 'triangle' || shape === 'diamond';
-    obstacles.push({ id: `${id}-${i}`, kind, shape, z, x, y,
-      width: (index === 0 ? 8.8 : index === 1 ? 5.2 : index === 5 ? 5 : 6.6) + (narrow ? 1.5 : 0),
-      height: (index === 0 ? 8 : index === 1 ? 5.5 : index === 5 ? 5.2 : 6.6) + (narrow ? 1.5 : 0),
-      thickness: kind === 'wall' ? 1.1 : 0.65, period: 5 + (i % 3), phase: i * 0.8,
-      amplitude: kind === 'shutter' ? 2.2 : 1.4, strength: i % 2 ? 7 : -7 });
-  }
+  const cadence = 44 - index * 2;
+  const opening = [10, 9.4, 8.8, 7.8, 7.2, 6.7, 6.2, 5.8, 5.4][index];
   let pickupIndex = 0;
-  for (const [j, gate] of obstacles.filter(isGate).entries()) {
-    gate.tilt = j % 3 === 1 ? Number(((j % 2 ? 1 : -1) * (.2 + index * .07)).toFixed(6)) : 0;
-    if (j % 6 === 3) {
-      gate.kind = 'twist_gate'; gate.shape = 'rectangle'; gate.width = index === 0 ? 1.28 : 1.16; gate.height = index === 0 ? 6 : 5.4;
-      gate.x = 0; gate.y = 7; gate.tilt = index === 1 && j % 12 > 6 ? Math.PI / 2 : index === 3 ? -.3 : 0;
-      if ([1, 3, 5].includes(index)) for (let stage = 1; stage <= 2; stage++) {
-        const z = gate.z + stage * 4.5;
-        if (checkpoints.some(cp => Math.abs(cp.z - z) < 22)) continue;
-        obstacles.push({ ...gate, id: `${gate.id}-twist-${stage}`, z, width: 1.35, tilt: gate.tilt + stage * .12 });
+  const safe = (z: number) => z < length - 40 && checkpoints.every(cp => Math.abs(cp.z - z) >= 24);
+  const boundaries = [0, ...checkpoints.map(cp => cp.z), length];
+
+  for (let stage = 0; stage < boundaries.length - 1; stage++) {
+    const start = boundaries[stage], end = boundaries[stage + 1];
+    const mirror = stage % 2 ? -1 : 1;
+    // The empty plaza around each checkpoint lets the bird level out before the next motif.
+    for (let z = stage === 0 ? 70 : start + 34, slot = 0; z <= end - (end === length ? 48 : 26); z += cadence, slot++) {
+      const [rx, ry, shape] = route[(slot + (stage % 3) * 2) % route.length];
+      let kind: ObstacleKind = slot % 3 === 1 ? 'wall' : 'ring';
+      if (index === 1 && slot === 2 && stage % 2) kind = 'rotating_gate';
+      if ((index === 4 || index === 5) && slot % 3 !== 0) kind = slot % 3 === 1 ? 'shutter' : 'rotating_gate';
+      if (index >= 6 && slot % 3 === 1) kind = stage % 2 ? 'shutter' : 'rotating_gate';
+      if (index === 8 && slot % 3 === 2) kind = 'rotating_gate';
+      const widthScale = shape === 'triangle' ? 1.75 : shape === 'oval' ? 1.4 : shape === 'diamond' ? 1.25 : shape === 'rectangle' ? 1.12 : 1;
+      const heightScale = shape === 'triangle' ? 1.65 : shape === 'oval' ? .86 : shape === 'diamond' ? 1.4 : shape === 'rectangle' ? .88 : 1;
+      const gate: ObstacleDefinition = {
+        id: `${id}-s${stage + 1}-g${slot + 1}`, kind, shape, z,
+        x: quantize(stage === 0 && slot === 0 ? 0 : rx * mirror), y: ry,
+        width: quantize(opening * widthScale), height: quantize(opening * heightScale),
+        thickness: kind === 'wall' ? 1.15 : .75,
+        period: 8 - index * .24 + slot % 3, phase: quantize(stage * .7 + slot * .45),
+        amplitude: index < 6 ? 1.1 : 1.35, strength: mirror * (5 + index * .3),
+        tilt: slot % 2 ? quantize(mirror * (.18 + index * .045)) : 0,
+      };
+      // The final circuit's shorter cadence needs a central approach before its bank corridor.
+      if (index === 8 && slot === 2) gate.x = quantize(gate.x * .5);
+      // Isolated vertical slots teach rolling; later tiers extend them into two-part bank corridors.
+      if (slot === (index === 0 ? 2 : 3) && (stage % 2 === 0 || index >= 3)) {
+        gate.kind = 'twist_gate'; gate.shape = 'rectangle';
+        gate.width = index < 3 ? 1.55 : index < 6 ? 1.45 : 1.35;
+        gate.height = 7; gate.x = 0; gate.y = 7; gate.tilt = index < 3 ? 0 : quantize(mirror * .12);
+        if (index >= 3 && safe(z + 6) && z + 6 <= end - 26) {
+          obstacles.push({ ...gate, id: `${gate.id}-bank`, z: z + 6, width: gate.width + .1, tilt: quantize(gate.tilt + mirror * .1) });
+        }
       }
-    } else if (index === 5 && j % 4 !== 0) {
-      gate.x = Number((Math.sin(j * 1.2) * 3).toFixed(6)); gate.y = Number((6.5 + Math.cos(j * 1.2) * 2.3).toFixed(6));
+      obstacles.push(gate);
+      // Gifts sit in open air after the obstacle; no route relies on a shield to be traversable.
+      if (slot % 3 === 0 && safe(z + 15) && pickupIndex < 31) {
+        obstacles.push({ ...gate, id: `${gate.id}-gift`, kind: 'pickup', z: z + 15,
+          width: 2.8, height: 2.8, powerUp: pickupIndex % 2 ? 'shield' : 'boost', pickupIndex: pickupIndex++ });
+      }
+      if ((index === 2 || index >= 6) && slot % 3 === 1 && safe(z + 14)) {
+        obstacles.push({ ...gate, id: `${gate.id}-wind`, kind: 'gust', z: z + 14, width: 12, height: 10,
+          strength: mirror * (index === 2 ? 5 : 7 + (index - 6) * 1.5) });
+      }
+      if ((index === 5 || index === 8) && slot % 4 === 2 && safe(z + 12)) {
+        obstacles.push({ ...gate, id: `${gate.id}-dive`, kind: 'speed_zone', z: z + 12, width: 5, height: 5, y: 4, strength: 6 });
+      }
     }
-  }
-  for (const gate of obstacles) {
-    if (gate.shape === 'circle') gate.height = gate.width;
-    if (gate.shape === 'oval') { gate.width = Number((gate.width * 1.25).toFixed(6)); gate.height = Number((gate.height * .72).toFixed(6)); }
-  }
-  for (const gate of [...obstacles].filter(isGate).filter((_, i) => i % 2 === 0)) {
-    const z = gate.z + 13;
-    if (checkpoints.some(cp => Math.abs(cp.z - z) < 20) || pickupIndex >= 31) continue;
-    obstacles.push({ ...gate, id: `${gate.id}-gift`, kind: 'pickup', z, width: 2.6, height: 2.6, powerUp: pickupIndex % 2 ? 'shield' : 'boost', pickupIndex: pickupIndex++ });
   }
   obstacles.sort((a, b) => a.z - b.z);
-  if (index === 5) {
-    for (const gate of [...obstacles].filter((_, i) => i % 4 === 1)) {
-      const z = gate.z + 23;
-      if (checkpoints.some(cp => Math.abs(cp.z - z) < 25)) continue;
-      obstacles.push({ ...gate, id: `${gate.id}-shortcut`, kind: 'speed_zone', z, x: gate.x > 0 ? -4.5 : 4.5, y: 3.5, width: 3.4, height: 3.6, strength: 6 });
-    }
-    obstacles.sort((a, b) => a.z - b.z);
-  }
-  return { id, name, subtitle, difficulty, difficultyIndex: index, description, color, sky, ground,
-    estimatedClearSeconds, length, width: 24, floor: -2, ceiling: 17, finishY: 6,
-    version: '3.0.0', path: { turn: [.45, .6, .75, .65, .7, .85][index], wavelength: [160, 145, 135, 140, 150, 120][index], lift: [.12, .16, .14, .19, .25, .22][index] }, checkpoints, obstacles };
+  return { id, name, subtitle, difficulty: difficultyGroup.toUpperCase(), difficultyIndex: index, difficultyGroup, difficultyLevel,
+    description, color, sky, ground, estimatedClearSeconds: Math.ceil(length / 16),
+    length, width: 30, floor: -3, ceiling: 20, finishY: 6, version: '4.0.0',
+    path: { turn: [.48, .56, .64, .6, .7, .74, .8, .88, .96][index], wavelength: [180, 170, 160, 155, 150, 165, 145, 135, 140][index], lift: [.14, .17, .16, .2, .22, .31, .26, .3, .34][index] },
+    checkpoints, obstacles };
 });
 
 export function compileCourse(definition: CourseDefinition): CompiledCourse {

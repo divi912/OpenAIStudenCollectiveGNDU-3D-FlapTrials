@@ -34,7 +34,10 @@ import { gateShell } from './gate-shell';
 import { ringData } from './ring';
 import { sphereData } from './sphere';
 import { surfaceMap, type Finish } from './surfaces';
-import { garden, sceneryChunk, THEMES } from './scenery';
+import { sceneryChunk, THEMES } from './scenery';
+import { FxaaPostProcess } from '@babylonjs/core/PostProcesses/fxaaPostProcess.js';
+import { studioEnvironment, contactShadow } from './studio-lighting';
+import { PLAYGROUND, playgroundLook, playgroundSection, playgroundScenery } from './playground';
 import { partyEvent } from '../../shared/party';
 import { frameAt, trackToWorld, bodyRoll } from '../../shared/track';
 import { introShot } from '../../shared/intro';
@@ -56,6 +59,10 @@ export class GameScene {
   private birdLod?: AssetContainer;
   private kitAsset?: AssetContainer;
   private prototype = new Map<string, Mesh>();
+  private toyMaterials = new Map<string, PBRMaterial>();
+  private fxaa?: FxaaPostProcess;
+  private fxaaAttached = false;
+  private contact?: Mesh;
   private materials = new Map<string, StandardMaterial>();
   private surfaces = new Map<Finish, ReturnType<typeof surfaceMap>>();
   private menuRoot: TransformNode;
@@ -111,6 +118,9 @@ export class GameScene {
     this.camera = new FreeCamera('camera', new Vector3(15, 11, 22), scene);
     this.camera.minZ = .15; this.camera.maxZ = 600; this.camera.fov = .68;
     this.camera.setTarget(new Vector3(0, 1, 0));
+    this.fxaa = new FxaaPostProcess('smooth-flight-edges', 1, null, Texture.BILINEAR_SAMPLINGMODE, engine);
+    scene.environmentTexture = studioEnvironment(scene); scene.environmentIntensity = .45;
+    this.contact = contactShadow(scene);
     const sky = new HemisphericLight('soft-sky', new Vector3(0, 1, 0), scene); sky.intensity = .72; sky.groundColor = c3('#647487');
     const sun = new DirectionalLight('sun', new Vector3(-.5, -.8, .6), scene); sun.intensity = 1.35; sun.diffuse = c3('#fff0cf');
     scene.imageProcessingConfiguration.toneMappingEnabled = true;
@@ -165,10 +175,21 @@ export class GameScene {
     }
     return mat;
   }
+  private toyMaterial(color: string): PBRMaterial {
+    let material = this.toyMaterials.get(color);
+    if (!material) {
+      material = new PBRMaterial(`toy-plastic-${color}`, this.scene);
+      material.albedoColor = c3(color).toLinearSpace(); material.metallic = 0;
+      material.roughness = .42; material.clearCoat.isEnabled = true;
+      material.clearCoat.intensity = .22; material.clearCoat.roughness = .3;
+      this.toyMaterials.set(color, material);
+    }
+    return material;
+  }
   private source(kind: string, color: string): Mesh {
     const key = `${kind}:${color}`; let mesh = this.prototype.get(key);
     if (!mesh) {
-      if (kind === 'cloud' || kind === 'leaf') { mesh = new Mesh(key, this.scene); sphereData(kind === 'cloud' ? 32 : 16, kind === 'cloud' ? 16 : 8).applyToMesh(mesh); }
+      if (kind === 'cloud' || kind === 'leaf' || kind === 'toy-leaf') { mesh = new Mesh(key, this.scene); sphereData(kind === 'cloud' ? 32 : 16, kind === 'cloud' ? 16 : 8).applyToMesh(mesh); }
       else if (kind === 'bubble' || kind === 'sun') mesh = CreateSphere(key, { diameter: 1, segments: 24 }, this.scene);
       else if (kind === 'rock') mesh = CreateSphere(key, { diameter: 1, segments: 8 }, this.scene);
       else if (kind === 'banner') mesh = CreatePlane(key, { size: 1 }, this.scene);
@@ -179,10 +200,10 @@ export class GameScene {
         for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5, r = i % 2 ? .43 : 1; data.positions.push(Math.sin(a) * r, Math.cos(a) * r, 0); data.normals.push(0, 0, -1); data.indices.push(0, i + 1, (i + 1) % 10 + 1); }
         data.applyToMesh(mesh); this.mat(color, false).backFaceCulling = false;
       }
-      else if (kind === 'hoop') { mesh = new Mesh(key, this.scene); ringData().applyToMesh(mesh); }
+      else if (kind === 'hoop' || kind === 'toy-hoop') { mesh = new Mesh(key, this.scene); ringData(kind === 'toy-hoop' ? .13 : .045).applyToMesh(mesh); }
       else if (kind === 'island') mesh = CreateCylinder(key, { height: 1, diameterTop: 2, diameterBottom: 1.1, tessellation: 48 }, this.scene);
       else if (kind === 'cone' || kind === 'peak' || kind === 'grass') mesh = CreateCylinder(key, { height: 1, diameterTop: kind === 'cone' ? .3 : 0, diameterBottom: 1, tessellation: kind === 'peak' ? 9 : 8 }, this.scene);
-      else if (kind === 'rod') mesh = CreateCylinder(key, { height: 1, diameter: 1, tessellation: 20 }, this.scene);
+      else if (kind === 'rod' || kind === 'podium') mesh = CreateCylinder(key, { height: 1, diameter: 1, tessellation: kind === 'podium' ? 96 : 20 }, this.scene);
       else if (kind === 'panel') { mesh = (this.kitAsset!.meshes.find(m => m.name === 'RoundedPanel') as Mesh).clone(key, null, true)!; mesh.parent = null; mesh.position.setAll(0); mesh.rotationQuaternion = null; mesh.scaling.setAll(1); }
       else if (kind === 'gear') { mesh = (this.kitAsset!.meshes.find(m => m.name === 'Gear') as Mesh).clone(key, null, true)!; mesh.parent = null; mesh.position.setAll(0); mesh.rotationQuaternion = null; }
       else if (kind === 'pipe') {
@@ -193,9 +214,11 @@ export class GameScene {
           mesh.position.setAll(0); mesh.scaling.setAll(1); mesh.rotationQuaternion = null; mesh.rotation.setAll(0);
         } else mesh = CreateCylinder(key, { height: 1, diameter: 1, tessellation: 16 }, this.scene);
       }
+      else if (kind === 'party-banner') mesh = CreatePlane(key, { size: 1 }, this.scene);
       else mesh = CreateBox(key, { size: 1 }, this.scene);
       mesh.material = this.mat(color, ['pipe', 'gem', 'gear', 'hoop', 'panel'].includes(kind), ['pipe', 'panel', 'gear'].includes(kind) ? 'enamel' : ['island', 'rock'].includes(kind) ? 'stone' : kind === 'leaf' ? 'foliage' : undefined); mesh.isVisible = false; mesh.isPickable = false;
-      if (kind === 'banner') mesh.material = this.stadiumMaterial(kind);
+      if (kind.startsWith('toy-') || kind === 'podium') mesh.material = this.toyMaterial(color);
+      if (kind === 'banner' || kind === 'party-banner') mesh.material = this.stadiumMaterial(kind);
       if (kind === 'sun') { const sun = new StandardMaterial('sun-disc', this.scene); sun.disableLighting = true; sun.emissiveColor = c3('#ffe5a7'); mesh.material = sun; }
       if (kind === 'bubble') {
         const bubble = new StandardMaterial('shield-bubble', this.scene); bubble.diffuseColor = c3(color); bubble.emissiveColor = c3(color).scale(.35); bubble.alpha = .16; bubble.specularPower = 100; bubble.backFaceCulling = true; mesh.material = bubble;
@@ -205,12 +228,13 @@ export class GameScene {
     }
     return mesh;
   }
-  private stadiumMaterial(kind: 'banner'): StandardMaterial {
+  private stadiumMaterial(kind: 'banner' | 'party-banner'): StandardMaterial {
     const texture = new DynamicTexture(`${kind}-atlas`, { width: 1024, height: 128 }, this.scene, true);
     const ctx = texture.getContext() as CanvasRenderingContext2D;
-    ctx.fillStyle = '#244e50'; ctx.fillRect(0, 0, 1024, 128);
+    const party = kind === 'party-banner';
+    ctx.fillStyle = party ? PLAYGROUND.purple : '#244e50'; ctx.fillRect(0, 0, 1024, 128);
     ctx.fillStyle = '#edc582'; ctx.fillRect(0, 0, 1024, 8); ctx.fillRect(0, 120, 1024, 8);
-    ctx.font = 'bold 39px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff3d5'; ctx.fillText('FLAP TRIALS   ✦   THE WING CUP   ✦   MAKE SOME NOISE', 512, 79);
+    ctx.font = 'bold 39px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff3d5'; ctx.fillText(party ? '✦   FLAP TRIALS   ✦   FLAP TRIALS   ✦' : 'FLAP TRIALS   ✦   THE WING CUP   ✦   MAKE SOME NOISE', 512, 79);
     texture.update(); const mat = new StandardMaterial(`${kind}-material`, this.scene);
     mat.diffuseTexture = texture; mat.specularColor = Color3.Black(); mat.emissiveTexture = texture; mat.emissiveColor = new Color3(.23, .23, .23); mat.backFaceCulling = false;
     return mat;
@@ -220,13 +244,13 @@ export class GameScene {
     mesh.parent = parent; mesh.position.set(position[0], position[1], position[2]); mesh.scaling.set(scale[0], scale[1], scale[2]); mesh.isPickable = false;
     return mesh;
   }
-  private gateFrame(o: ObstacleDefinition, color: string, parent: TransformNode) {
-    const key = `frame:${o.shape}:${o.width}:${o.height}:${o.thickness}:${o.kind === 'wall'}:${color}`;
+  private gateFrame(o: ObstacleDefinition, color: string, parent: TransformNode, toy = false) {
+    const key = `frame:${toy}:${o.shape}:${o.width}:${o.height}:${o.thickness}:${o.kind === 'wall'}:${color}`;
     let source = this.prototype.get(key);
     if (!source) {
       source = new Mesh(key, this.scene);
       gateShell(apertureVertices(o), o.kind === 'wall' ? .9 : .55, o.thickness).applyToMesh(source);
-      source.material = this.mat(color, true, 'enamel'); source.isVisible = false; source.isPickable = false;
+      source.material = toy ? this.toyMaterial(color) : this.mat(color, true, 'enamel'); source.isVisible = false; source.isPickable = false;
       this.prototype.set(key, source);
     }
     const frame = source.createInstance('bevelled-gate-frame'); frame.parent = parent; frame.isPickable = false;
@@ -259,20 +283,22 @@ export class GameScene {
   }
   private buildMenu(): void {
     const parent = this.menuRoot;
-    garden(this.instance.bind(this), parent, 0, -.15, 0, 5.1);
+    // A compact toy stadium keeps the character silhouette clear on the lobby screen.
+    this.instance('podium', '#6040ca', parent, [0, -.55, 0], [10.8, .65, 8.6]);
+    this.instance('podium', '#f8f4ff', parent, [0, -.13, 0], [10.5, .24, 8.3]);
+    this.instance('podium', '#37d4ed', parent, [0, .04, 0], [9.7, .18, 7.5]);
     const gate = new TransformNode('hero-gate', this.scene); gate.parent = parent; gate.position.set(-.8, 3.7, -1.8);
-    this.instance('hoop', '#e5b663', gate, [0, 0, 0], [3.2, 3.2, 2.8]);
-    this.instance('hoop', '#73b28b', gate, [0, 0, -.2], [3.55, 3.55, 3]);
-    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; this.instance('leaf', '#fff0b4', gate, [Math.cos(a) * 3.35, Math.sin(a) * 3.35, .2], [.19, .19, .16]); }
-    const hero = this.bird('hero', '#ffcc42', parent); hero.root.position.set(.1, 2.9, 2.6); hero.root.scaling.setAll(1.65); hero.root.rotation.y = .4;
-    const blue = this.bird('blue', '#55bce7', parent); blue.root.position.set(-4, 1.5, 2); blue.root.scaling.setAll(.63); blue.root.rotation.y = .25;
-    const pink = this.bird('pink', '#ed7773', parent); pink.root.position.set(3.8, 2.5, -1.2); pink.root.scaling.setAll(.56); pink.root.rotation.y = -.65;
+    this.instance('toy-hoop', '#ff4aa2', gate, [0, 0, -.15], [3.65, 3.65, 4.6]);
+    this.instance('toy-hoop', '#fff5d6', gate, [0, 0, .4], [2.78, 2.78, 2.1]);
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; this.instance('leaf', '#ffd84e', gate, [Math.cos(a) * 3.4, Math.sin(a) * 3.4, .3], [.22, .22, .16]); }
+    const hero = this.bird('hero', '#ffcf35', parent); hero.root.position.set(.1, 2.9, 2.6); hero.root.scaling.setAll(1.95); hero.root.rotation.y = .4;
+    const blue = this.bird('blue', '#32c8f0', parent); blue.root.position.set(-3.7, 1.5, 2); blue.root.scaling.setAll(.72); blue.root.rotation.y = .25;
+    const pink = this.bird('pink', '#ff62ad', parent); pink.root.position.set(3.8, 2.5, -1.2); pink.root.scaling.setAll(.68); pink.root.rotation.y = -.65;
     this.menuBirds.push(hero, blue, pink);
-    this.cloud(parent, -6.5, 5.2, -1, 1.4); this.cloud(parent, 4.7, 6.2, -7, 1.3); this.cloud(parent, 3.1, 5.6, -5, .85);
-    this.cloud(parent, -5, 5.6, -5.5, 1.1);
+    this.cloud(parent, -5.5, 5.8, -4, .95); this.cloud(parent, 4.7, 6.2, -7, 1.1);
     for (const x of [-4.4, 4.4]) {
-      this.instance('pipe', '#efead6', parent, [x, 1.5, 1.1], [.1, 2.6, .1]);
-      for (let row = 0; row < 3; row++) for (let col = 0; col < 4; col++) this.instance('box', (row + col) % 2 ? '#fff8e8' : '#354e47', parent, [x + .13 + col * .23, 2.5 - row * .23, 1.1], [.23, .23, .04]);
+      this.instance('pipe', '#f8f4ff', parent, [x, 1.5, 1.1], [.14, 2.6, .14]);
+      for (let row = 0; row < 3; row++) for (let col = 0; col < 4; col++) this.instance('box', (row + col) % 2 ? '#fff8ff' : '#653bd1', parent, [x + .13 + col * .23, 2.5 - row * .23, 1.1], [.23, .23, .04]);
     }
     this.menuRoot.rotation.y = -.1;
   }
@@ -282,9 +308,17 @@ export class GameScene {
     const low = this.settings.quality === 'low';
     const scale = Math.max(1, w / (low ? 1280 : 1920), h / (low ? 720 : 1080)) * (this.settings.quality === 'auto' ? this.resolution : 1);
     this.engine.setHardwareScalingLevel(scale); this.engine.resize();
+    if (this.fxaa && this.fxaaAttached === low) {
+      if (low) this.camera.detachPostProcess(this.fxaa); else this.camera.attachPostProcess(this.fxaa);
+      this.fxaaAttached = !low;
+    }
   }
   showMenu() {
     this.cameraBank = 0; this.camera.upVector.set(0, 1, 0);
+    const sky = this.scene.getLightByName('soft-sky') as HemisphericLight;
+    sky.intensity = 1.05; sky.groundColor = c3('#b4a6d8');
+    this.scene.getLightByName('sun')!.intensity = 1.05;
+    this.scene.environmentIntensity = .45; this.contact?.setEnabled(false);
     this.mode = 'menu'; this.menuRoot.setEnabled(true); this.courseRoot?.setEnabled(false);
     for (const b of this.birds.values()) b.root.setEnabled(false);
     this.skyMesh.setEnabled(false); this.sunMesh?.setEnabled(false); for (const line of this.streaks) line.setEnabled(false);
@@ -294,23 +328,34 @@ export class GameScene {
   }
   showCourse(course: CourseDefinition): void {
     this.cameraBank = 0; this.camera.upVector.set(0, 1, 0);
+    const fill = this.scene.getLightByName('soft-sky') as HemisphericLight;
+    const toy = !!course.difficultyGroup || course.id === 'skyline_sprint';
+    const look = playgroundLook(course);
+    this.scene.environmentIntensity = toy ? .55 : 0;
+    fill.intensity = toy ? 1.05 : .72; fill.groundColor = c3(toy ? '#abbce2' : '#647487');
+    this.scene.getLightByName('sun')!.intensity = toy ? 1.12 : 1.35;
     this.mode = 'race'; this.menuRoot.setEnabled(false); this.canvas.classList.add('racing');
     if (this.course?.id !== course.id || !this.courseRoot) this.buildCourse(course);
     this.course = course; this.courseRoot!.setEnabled(true);
-    const sky = c3(course.sky); this.scene.clearColor = new Color4(sky.r, sky.g, sky.b, 1);
+    const sky = c3(toy ? look.sky : course.sky); this.scene.clearColor = new Color4(sky.r, sky.g, sky.b, 1);
     const ctx = this.skyTexture.getContext(); const gradient = ctx.createLinearGradient(0, 0, 0, 256);
-    gradient.addColorStop(0, '#f5ebd9'); gradient.addColorStop(.48, course.sky); gradient.addColorStop(1, ['#298dcc', '#a68e93', '#578dc6', '#806aa7', '#c16e91', '#509a9b'][course.difficultyIndex]);
+    gradient.addColorStop(0, toy ? look.horizon : '#f5ebd9'); gradient.addColorStop(.48, toy ? look.sky : course.sky); gradient.addColorStop(1, toy ? look.skyTop : ['#298dcc', '#a68e93', '#578dc6', '#806aa7', '#c16e91', '#509a9b'][course.difficultyIndex]);
     ctx.fillStyle = gradient; ctx.fillRect(0, 0, 4, 256); this.skyTexture.update(); this.skyMesh.setEnabled(true); this.sunMesh.setEnabled(true);
     this.scene.fogMode = Scene.FOGMODE_LINEAR; this.scene.fogStart = 130; this.scene.fogEnd = 370; this.scene.fogColor = sky;
-    this.camera.fov = 75 * Math.PI / 180; this.follow.set(0, 8, -7); this.look.set(0, 7, 20); this.resize();
+    this.camera.fov = (toy ? 68 : 75) * Math.PI / 180; this.follow.set(0, 8, -7); this.look.set(0, 7, 20); this.resize();
   }
   private buildCourse(course: CourseDefinition): void {
     this.audience?.clear();
     this.courseRoot?.dispose(false, false); this.obstacles = []; this.chunks = []; this.decorRotors = [];
     const root = this.courseRoot = new TransformNode(`course-${course.id}`, this.scene);
+    const toy = !!course.difficultyGroup || course.id === 'skyline_sprint';
+    const look = playgroundLook(course);
+    if (toy) for (let z = 0; z < course.length + 24; z += 128) this.chunks.push({ root: playgroundSection(this.instance.bind(this), root, course, z), z });
     for (let z = 0; z < course.length + 200; z += 128) {
       const chunk = new TransformNode(`chunk-${z}`, this.scene); chunk.parent = root; this.chunks.push({ root: chunk, z });
-      sceneryChunk(this.instance.bind(this), chunk, course, z, this.decorRotors, stand => this.audience?.add(stand, z + 48));
+      if (toy) playgroundScenery(this.instance.bind(this), chunk, z, stand => this.audience?.add(stand, z + 48), course);
+      else sceneryChunk(this.instance.bind(this), chunk, course, z, this.decorRotors, stand => this.audience?.add(stand, z + 48));
+      if (toy) { this.cloud(chunk, -42, -12, z + 10, 12); this.cloud(chunk, 46, -15, z + 90, 14); }
       for (const side of [-1, 1]) {
         this.cloud(chunk, side * 39, 29 + (z % 7), z + 60, 8);
         this.cloud(chunk, side * 70, 44, z + 10, 6);
@@ -336,14 +381,14 @@ export class GameScene {
           const line = this.instance('rod', o.kind === 'gust' ? '#8ce4ed' : '#ffcf6d', group, [-2 + i * 1.5, 1, 0], [.1, 1.4, .1]); line.rotation.z = o.kind === 'gust' ? 1.3 : -.7;
         }
       } else {
-        const color = o.kind === 'twist_gate' ? '#df9a83' : o.kind === 'rotating_gate' ? '#a28abd' : o.kind === 'shutter' ? '#d6a465' : THEMES[course.difficultyIndex].leaf;
-        this.gateFrame(o, color, group);
+        const color = toy ? (o.kind === 'twist_gate' ? look.purple : o.kind === 'wall' ? look.blue : look.pink) : o.kind === 'twist_gate' ? '#df9a83' : o.kind === 'rotating_gate' ? '#a28abd' : o.kind === 'shutter' ? '#d6a465' : THEMES[course.difficultyIndex].leaf;
+        this.gateFrame(o, color, group, toy);
         const local = { ...o, kind: o.kind === 'wall' ? 'wall' as const : 'ring' as const, x: 0, y: 0, z: 0, tilt: 0 };
         for (const box of obstacleBoxes(local, 0)) {
-          const trim = this.instance('rod', '#ffcf6d', group, [box.center[0], box.center[1], -o.thickness / 2 - .02], [.065, box.half[0] * 2, .065]); trim.rotation.z = box.angle! - Math.PI / 2;
+          const trim = this.instance('rod', toy ? look.white : '#ffcf6d', group, [box.center[0], box.center[1], -o.thickness / 2 - .02], [.065, box.half[0] * 2, .065]); trim.rotation.z = box.angle! - Math.PI / 2;
         }
         const points = apertureVertices(o);
-        for (let i = 0; i < points.length; i += points.length > 8 ? 8 : 1) {
+        if (!toy) for (let i = 0; i < points.length; i += points.length > 8 ? 8 : 1) {
           const [x, y] = points[i];
           this.instance('leaf', '#f7dfaa', group, [x * 1.06, y * 1.06, -.1], [.25, .25, o.thickness + .16]);
           this.instance('leaf', '#696f69', group, [x * 1.06, y * 1.06, -o.thickness / 2 - .13], [.10, .10, .07]);
@@ -369,10 +414,10 @@ export class GameScene {
       const cp = course.checkpoints[i]; const z = cp?.z ?? course.length;
       const group = new TransformNode(`checkpoint-${i}`, this.scene); group.parent = root;
       for (const side of [-1, 1]) {
-        this.instance('pipe', cp ? '#f4d578' : '#eee8d4', group, [side * 11, 6, z], [.25, 16, .25]);
-        for (let row = 0; row < 4; row++) for (let col = 0; col < 3; col++) this.instance('box', cp ? ((row + col) % 2 ? '#fff1c1' : '#e7c464') : ((row + col) % 2 ? '#fff5df' : '#355849'), group, [side * 11 + (col + .5) * .5 * -side, 13 - row * .5, z], [.5, .5, .1]);
+        this.instance('rod', toy ? (cp ? look.yellow : look.purple) : cp ? '#f4d578' : '#eee8d4', group, [side * 11, 6, z], [.25, 16, .25]);
+        for (let row = 0; row < 4; row++) for (let col = 0; col < 3; col++) this.instance('box', toy ? ((row + col) % 2 ? look.white : cp ? look.pink : look.purple) : cp ? ((row + col) % 2 ? '#fff1c1' : '#e7c464') : ((row + col) % 2 ? '#fff5df' : '#355849'), group, [side * 11 + (col + .5) * .5 * -side, 13 - row * .5, z], [.5, .5, .1]);
       }
-      this.instance('box', cp ? '#ecd27d' : '#f5f0df', group, [0, 14.5, z], [22, .3, .25]);
+      this.instance(toy ? 'toy-block' : 'box', toy ? (cp ? look.yellow : look.purple) : cp ? '#ecd27d' : '#f5f0df', group, [0, 14.5, z], [22, toy ? .8 : .3, toy ? .8 : .25]);
       const f = frameAt(course, z); for (const child of group.getChildren()) if (child instanceof TransformNode) child.position.z -= z;
       group.position.set(...f.position); group.rotationQuaternion = Quaternion.RotationYawPitchRoll(f.yaw, -f.pitch, 0);
     }
@@ -400,6 +445,15 @@ export class GameScene {
       this.menuRoot.rotation.y = -.1 + (this.settings.reducedMotion ? 0 : Math.sin(seconds * .25) * .025);
     } else {
       const local = players.find(p => p.playerId === localId);
+      const showContact = !!this.course?.difficultyGroup && !!local && local.status === 'racing' && introElapsed === undefined;
+      this.contact?.setEnabled(showContact);
+      if (showContact && this.contact && local) {
+        const f = frameAt(this.course!, local.z), size = 2.4 + Math.max(0, local.y + 3) * .16;
+        this.contact.position.set(...trackToWorld(this.course!, local.x, this.course!.floor + .025, local.z));
+        this.contact.rotationQuaternion = Quaternion.RotationYawPitchRoll(f.yaw, Math.PI / 2 - f.pitch, 0);
+        this.contact.scaling.set(size, size * .7, 1);
+        this.contact.visibility = Math.max(.25, 1 - (local.y + 3) / 30);
+      }
       const shot = introElapsed === undefined ? undefined : introShot(introElapsed, this.course!.length, this.settings.reducedMotion);
       if (shot) {
         this.cameraBank = 0; this.camera.upVector.set(0, 1, 0);
@@ -429,7 +483,8 @@ export class GameScene {
         this.audience?.update(local.z, this.settings.quality === 'low', this.settings.quality === 'auto' && this.resolution > 1.15);
         for (const chunk of this.chunks) chunk.root.setEnabled(chunk.z > local.z - 200 && chunk.z < local.z + 330);
         const boosted = local.simulationTick < local.boostUntilTick || local.speed > 23;
-        const targetFov = (boosted && !this.settings.reducedMotion ? 81 : 75) * Math.PI / 180;
+        const baseFov = this.course?.difficultyGroup ? 68 : 75;
+        const targetFov = (boosted && !this.settings.reducedMotion ? baseFov + 6 : baseFov) * Math.PI / 180;
         this.camera.fov += (targetFov - this.camera.fov) * (1 - Math.exp(-dt * 3));
         for (let i = 0; i < this.streaks.length; i++) {
           const line = this.streaks[i]; line.setEnabled(boosted && !this.settings.reducedMotion);

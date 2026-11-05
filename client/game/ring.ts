@@ -1,9 +1,9 @@
 import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
 
 /** Smooth circular silhouette with a small radial section, instead of a square tessellation budget. */
-export function ringData(): VertexData {
+export function ringData(tube = .045): VertexData {
   const positions: number[] = [], normals: number[] = [], uvs: number[] = [], indices: number[] = [];
-  const around = 48, radial = 8, radius = .955, tube = .045;
+  const around = 48, radial = tube > .045 ? 16 : 8, radius = 1 - tube;
   for (let i = 0; i <= around; i++) for (let j = 0; j <= radial; j++) {
     const a = i / around * Math.PI * 2, b = j / radial * Math.PI * 2;
     const r = radius + Math.cos(b) * tube;

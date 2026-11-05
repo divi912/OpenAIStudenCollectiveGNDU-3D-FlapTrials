@@ -19,7 +19,7 @@ export class LoadingFeedback {
     this.show(state.kind, state.title, state.detail, state.kind === 'connecting');
   }
   race(loaded: number, total: number, remaining: number, sceneReady: boolean) {
-    this.show('race', sceneReady ? 'Waiting for the flock…' : 'Loading birds and stadium…', sceneReady ? 'Everyone starts together once their course is ready.' : 'Preparing the 3D world. Please keep this tab open.', false);
+    this.show('race', sceneReady ? 'Waiting for players…' : 'Loading birds and stadium…', sceneReady ? 'Everyone starts together once their course is ready.' : 'Preparing the 3D world. Please keep this tab open.', false);
     const count = `${loaded} / ${total} players ready · ${Math.max(0, Math.ceil(remaining))}s loading window`;
     if (this.count.textContent !== count) this.count.textContent = count;
   }

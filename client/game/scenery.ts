@@ -4,12 +4,16 @@ import type { CourseDefinition } from '../../shared/protocol';
 
 export type Place = (kind: string, color: string, parent: TransformNode, position?: number[], scale?: number[]) => InstancedMesh;
 export const THEMES = [
-  { grass: '#71ae70', rim: '#b3d488', stone: '#9a998a', dark: '#646d72', leaf: '#588a63', accent: '#ffcd71' },
-  { grass: '#d5b980', rim: '#f4dba5', stone: '#b88d73', dark: '#8e716c', leaf: '#8baf89', accent: '#a5e0d4' },
-  { grass: '#88bab0', rim: '#bfdec2', stone: '#8eabb4', dark: '#667f97', leaf: '#629c94', accent: '#fff2a9' },
-  { grass: '#a59fb8', rim: '#d2c1d0', stone: '#8d819b', dark: '#605c78', leaf: '#8d87ae', accent: '#edbd6d' },
-  { grass: '#c3a283', rim: '#f3cf9c', stone: '#c18d7c', dark: '#926c7c', leaf: '#92a791', accent: '#ffcf7f' },
-  { grass: '#709b79', rim: '#b4cb8b', stone: '#8c9a85', dark: '#596f69', leaf: '#497d69', accent: '#e3c474' },
+  // Ordered with the three easy, three medium, then three hard courses.
+  { grass: '#27cce3', rim: '#fff9ff', stone: '#7451d5', dark: '#4b368f', leaf: '#ff51a7', accent: '#ffe05b' },
+  { grass: '#80e6e0', rim: '#fffbed', stone: '#9b69da', dark: '#70509e', leaf: '#ff7b9f', accent: '#ffe989' },
+  { grass: '#44dce7', rim: '#f4ffff', stone: '#387bc9', dark: '#335f93', leaf: '#ff9051', accent: '#ffe663' },
+  { grass: '#62d8b2', rim: '#fff4e5', stone: '#744bb5', dark: '#563781', leaf: '#f65091', accent: '#ffcf72' },
+  { grass: '#52c9c9', rim: '#fff6da', stone: '#574c9b', dark: '#3c356e', leaf: '#ff8056', accent: '#ffcf43' },
+  { grass: '#42d8ed', rim: '#fff2f8', stone: '#6358d6', dark: '#484092', leaf: '#ff566b', accent: '#ffbe4d' },
+  { grass: '#4fe5cd', rim: '#eaf9ff', stone: '#48448e', dark: '#302e62', leaf: '#ef4fa5', accent: '#d5fa67' },
+  { grass: '#4bd9f6', rim: '#e3f6ff', stone: '#3c397c', dark: '#292753', leaf: '#b36aff', accent: '#fff06c' },
+  { grass: '#74d9ef', rim: '#fff9e9', stone: '#6944bc', dark: '#493083', leaf: '#fa5b99', accent: '#ffd35c' },
 ];
 const noise = (n: number) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 

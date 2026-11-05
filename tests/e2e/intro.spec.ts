@@ -8,15 +8,15 @@ test('solo previews the course and lineup without advancing the race', async ({ 
   const clockStart = new Date('2026-10-23T12:00:00Z');
   await page.clock.install({ time: clockStart });
   await page.clock.pauseAt(new Date(clockStart.getTime() + 1000));
-  await page.getByRole('button', { name: 'Solo practice' }).click();
+  await page.getByRole('button', { name: 'Practice' }).click();
   await page.clock.runFor(100);
   await expect(page.locator('#race-intro')).toBeVisible();
-  await expect(page.locator('#intro-label')).toHaveText('YOUR NEXT CHALLENGE');
+  await expect(page.locator('#intro-label')).toHaveText('COURSE');
   await page.keyboard.press('Space');
   expect(await page.evaluate(() => (window as any).__flap.practice.z)).toBe(0);
   await page.screenshot({ path: '.cache/intro-course.png' });
   await page.clock.fastForward(4100);
-  await expect(page.locator('#intro-label')).toHaveText('MEET THE FLOCK', { timeout: 6000 });
+  await expect(page.locator('#intro-label')).toHaveText('PLAYERS', { timeout: 6000 });
   await expect(page.locator('#intro-roster')).toContainText('YOU');
   expect(await page.evaluate(() => (window as any).__flap.practice.z)).toBe(0);
   await page.screenshot({ path: '.cache/intro-lineup.png' });

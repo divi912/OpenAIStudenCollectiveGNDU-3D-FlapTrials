@@ -9,8 +9,8 @@ describe('course and protocol integrity', () => {
       expect(obstacle.y).toBe(Number(obstacle.y.toFixed(6)));
     }
   });
-  it('loads all six unrestricted courses and rejects unsafe checkpoint staging', () => {
-    expect(COURSES.map(c => c.id)).toEqual(['skyline_sprint', 'the_needle', 'crosswind', 'clockwork', 'terminal_velocity', 'featherless']);
+  it('loads all nine unrestricted courses and rejects unsafe checkpoint staging', () => {
+    expect(COURSES.map(c => c.id)).toEqual(['skyline_sprint', 'cloud_carnival', 'crosswind', 'the_needle', 'clockwork', 'terminal_velocity', 'featherless', 'storm_spiral', 'crown_circuit']);
     for (const course of COURSES) expect(compileCourse(course).hash.length).toBeGreaterThan(0);
     expect(() => compileCourse({ ...COURSES[0], checkpoints: [{ id: 'bad', x: 0, y: 6, z: 70 }] })).toThrow(/staging/);
   });

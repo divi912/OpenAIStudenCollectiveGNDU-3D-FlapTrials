@@ -6,10 +6,10 @@ test('phone flight uses multiple fingers, releases cancelled touches, and fits r
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto('/?webgl=1');
   await expect(page.locator('body')).toHaveAttribute('data-renderer', 'WebGL2', { timeout: 45000 });
-  await page.getByRole('button', { name: 'Flight school' }).click();
-  await expect(page.getByRole('heading', { name: 'Touch flight school.' })).toBeVisible();
-  await page.getByRole('button', { name: 'Ready to flap' }).click();
-  await page.getByRole('button', { name: 'Solo practice', exact: true }).click();
+  await page.getByRole('button', { name: 'Controls' }).click();
+  await expect(page.getByRole('heading', { name: 'Touch controls' })).toBeVisible();
+  await page.getByRole('button', { name: 'Done' }).click();
+  await page.getByRole('button', { name: 'Practice', exact: true }).click();
   await expect(page.locator('.touch-controls')).toBeVisible({ timeout: 20000 });
   const session = await context.newCDPSession(page);
   const point = async (name: string) => {

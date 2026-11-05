@@ -36,6 +36,7 @@ export interface ObstacleDefinition {
 export interface CheckpointDefinition { id: string; z: number; x: number; y: number }
 export interface CourseDefinition {
   id: string; version: string; name: string; subtitle: string; difficulty: string; difficultyIndex: number;
+  difficultyGroup?: 'easy' | 'medium' | 'hard'; difficultyLevel?: 1 | 2 | 3;
   description: string; color: string; sky: string; ground: string; estimatedClearSeconds: number;
   length: number; width: number; floor: number; ceiling: number; finishY: number;
   checkpoints: CheckpointDefinition[]; obstacles: ObstacleDefinition[];

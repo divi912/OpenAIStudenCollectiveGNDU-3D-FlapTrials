@@ -34,7 +34,7 @@ export class Connection {
     try {
       const health = await waitForServer(SERVER_URL, pending.signal);
       if (!canRequestRoom(health, mode)) throw new Error('Server full: all rooms are busy.');
-      this.progress({ kind: 'connecting', title: mode === 'join' ? 'Joining your flock…' : mode === 'quick' ? 'Finding an open race…' : 'Creating your room…', detail: 'Reserving your place and opening a secure connection.' });
+      this.progress({ kind: 'connecting', title: mode === 'join' ? 'Joining room…' : mode === 'quick' ? 'Finding an open race…' : 'Creating your room…', detail: 'Reserving your place and opening a secure connection.' });
       await this.openRoom(mode, name, color, code, courseId, pending);
     } catch (cause) {
       if (pending.signal.aborted) throw new Error('Connection cancelled.');
@@ -79,7 +79,7 @@ export class Connection {
     room.onMessage('notice', text => this.notice(String(text)));
     room.onError((_code, message) => this.notice(message ?? 'The connection hit a bump. Please rejoin the room.'));
     room.onDrop(() => { this.progress({ kind: 'reconnecting', title: 'Connection interrupted. Reconnecting…', detail: 'The race clock continues. Your place is held for up to 10 seconds during a race.' }); });
-    room.onReconnect(() => { this.reconciler?.reset(); this.progress(undefined); this.notice('Back in the sky.'); });
+    room.onReconnect(() => { this.reconciler?.reset(); this.progress(undefined); this.notice('Reconnected.'); });
     room.onLeave(() => { if (this.room === room) { this.room = undefined; this.disposePrediction(); this.progress(undefined); this.lost(); } });
   }
   cancelConnect() { this.pending?.abort(); this.progress(undefined); }

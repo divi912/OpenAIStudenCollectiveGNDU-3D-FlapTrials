@@ -10,7 +10,7 @@ for (const reducedMotion of [false, true]) {
     const start = new Date('2026-10-23T12:00:00Z');
     await page.clock.install({ time: start });
     await page.clock.pauseAt(new Date(start.getTime() + 1000));
-    await page.getByRole('button', { name: 'Solo practice' }).click();
+    await page.getByRole('button', { name: 'Practice' }).click();
     await page.clock.fastForward(9200);
     const tag = page.locator('.bird-nametag.local');
     await expect(tag).toBeVisible();

@@ -6,13 +6,13 @@ test('solid audience birds scale down with quality and survive practice restarts
   await expect(page.locator('body')).toHaveAttribute('data-renderer', 'WebGL2', { timeout: 45000 });
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByLabel('Visual quality').selectOption('high');
-  await page.getByRole('button', { name: 'All set' }).click();
-  await page.getByRole('button', { name: 'Solo practice' }).click();
+  await page.getByRole('button', { name: 'Done' }).click();
+  await page.getByRole('button', { name: 'Practice' }).click();
   await page.waitForFunction(() => (window as any).__flap.stats.audience.birds > 0);
   const high = await page.evaluate(() => (window as any).__flap.stats.audience);
   expect(high.birds).toBeGreaterThan(300); expect(high.draws).toBeLessThanOrEqual(6);
   await expect(page.locator('.telemetry-panel,.attitude-panel,.cockpit-style')).toHaveCount(0);
-  await expect(page.locator('#course-progress')).toBeVisible();
+  await expect(page.getByRole('progressbar', { name: 'Course progress' })).toBeVisible({ timeout: 12000 });
   // Exercise the actual two-badge markup at desktop and narrow HUD sizes.
   for (const width of [1440, 1280, 780]) {
     await page.setViewportSize({ width, height: 900 });
@@ -31,9 +31,16 @@ test('solid audience birds scale down with quality and survive practice restarts
   await page.waitForFunction(triangles => (window as any).__flap.stats.audience.triangles < triangles / 2, high.triangles);
   const low = await page.evaluate(() => (window as any).__flap.stats.audience);
   expect(low.birds).toBeGreaterThan(0);
-  for (let i = 0; i < 3; i++) await page.keyboard.press('KeyR');
-  await page.waitForFunction(() => (window as any).__flap.stats.audience.birds > 0);
-  expect((await page.evaluate(() => (window as any).__flap.stats.audience)).birds).toBe(low.birds);
+  const start = new Date();
+  await page.clock.install({ time: start });
+  await page.clock.pauseAt(new Date(start.getTime() + 1000));
+  const restartCounts: number[] = [];
+  for (let i = 0; i < 3; i++) {
+    await page.keyboard.press('KeyR'); await page.clock.runFor(50);
+    restartCounts.push((await page.evaluate(() => (window as any).__flap.stats.audience)).birds);
+  }
+  expect(restartCounts[0]).toBeGreaterThan(0);
+  expect(new Set(restartCounts).size).toBe(1);
   expect(errors).toEqual([]);
 });
 

@@ -1,6 +1,6 @@
 # Flap Trials
 
-Tiny wings. Big trials. A keyboard-controlled multiplayer party flight racer in a floating bird stadium.
+A multiplayer3D flight racer with keyboard and touch controls.
 
 ## Model polish � 2026-10-23
 
@@ -70,7 +70,7 @@ The asset generator uses Blender's Python interface without external add-ons. An
 
 ## Courses and architecture
 
-All six courses are open immediately: Skyline Sprint, The Needle, Crosswind, Clockwork, Terminal Velocity, and Featherless. Every map now has its own turning/climbing path, tilted gates and roll-slot challenges. Needle, Clockwork and Featherless add multi-stage twist tunnels; Terminal emphasizes pitching climbs/dives; Crosswind combines banks with gusts. A user-facing course editor remains future work.
+All nine courses are available immediately. Easy: Skyline Sprint, Cloud Carnival, Crosswind. Medium: The Needle, Clockwork, Terminal Velocity. Hard: Featherless, Storm Spiral, Crown Circuit. Each tier has three increasingly demanding stages. Every map now has its own turning/climbing path, tilted gates and roll-slot challenges. Needle, Clockwork and Featherless add multi-stage twist tunnels; Terminal emphasizes pitching climbs/dives; Crosswind combines banks with gusts. A user-facing course editor remains future work.
 
 - `shared`: course validation/compilation, track frames/world transforms, deterministic angular flight, swept body/wing collision, protocol, schema, ranking.
 - `client`: Babylon scene, local prediction/reconciliation, remote interpolation, menus, HUD, keyboard controls and synthesized audio.
@@ -84,7 +84,7 @@ Private races need 2–8 ready players. Loading times out after 30 seconds. Unlo
 ## Verification
 
 ```sh
-npm test                 # Physics, collision, lifecycle, input validation, all-six-course playability
+npm test                 # Physics, collision, lifecycle, input validation, all-nine-course playability
 npm run typecheck
 npm run test:e2e         # First run: npx playwright install chromium
 npm run assets:check
