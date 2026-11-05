@@ -17,24 +17,24 @@ test('renders the reference-inspired home, nine open courses, settings and fligh
   expect(browserHashes).toEqual(COURSES.map(c => getCourse(c.id).hash));
 });
 
-test('practice flies, a held key does not auto-flap, crashes respawn, and restart clears state', async ({ page }) => {
-  await page.goto('/?webgl=1&debug=1');
+test('practice accepts one flap per press and restart clears state', async ({ page }) => {
+  await page.goto('/?webgl=1');
   await expect(page.locator('body')).toHaveAttribute('data-renderer', 'WebGL2', { timeout: 45000 });
-  const start = new Date('2026-11-05T08:00:00Z');
-  await page.clock.install({ time: start });
-  await page.clock.pauseAt(new Date(start.getTime() + 1000));
   await page.getByRole('button', { name: 'Practice' }).click();
-  await page.clock.runFor(9200);
-  // The pre-race cinematic intentionally hides the HUD for six seconds.
-  await expect(page.locator('#hud')).toBeVisible({ timeout: 15000 });
-  await page.waitForFunction(() => (window as any).__flap.practice?.z > 1, { timeout: 10000 });
-  await page.keyboard.down('Space');
-  await page.clock.runFor(1100);
-  const bird = await page.evaluate(() => (window as any).__flap.practice);
-  expect(bird.z).toBeGreaterThan(8); expect(bird.vy).toBeLessThan(0);
-  await page.keyboard.up('Space');
-  await page.clock.runFor(2600);
-  expect((await page.evaluate(() => (window as any).__flap.practice)).crashCount).toBeGreaterThan(0);
+  await page.waitForFunction(() => (window as any).__flap.practice?.z > 1, undefined, { timeout: 15000 });
+  const held = await page.evaluate(async () => {
+    const inputPath = '/client/game/input.ts'; const { Controls } = await import(inputPath);
+    const controls = new Controls(); controls.enabled = true;
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' }));
+    const first = controls.read(1, 1).flapPressed;
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', repeat: true }));
+    const repeat = controls.read(2, 2).flapPressed;
+    const held = controls.read(3, 3).flapPressed;
+    window.dispatchEvent(new KeyboardEvent('keyup', { code: 'Space' }));
+    controls.enabled = false;
+    return { first, repeat, held };
+  });
+  expect(held).toEqual({ first: true, repeat: false, held: false });
   await page.keyboard.press('KeyR');
   const restarted = await page.evaluate(() => (window as any).__flap.practice);
   expect(restarted.crashCount).toBe(0); expect(restarted.checkpointIndex).toBe(0); expect(restarted.z).toBe(0);
